@@ -1,0 +1,1621 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bitbench</title>
+<style>
+:root{--bg:#eef2f5;--panel:#fff;--ink:#14202b;--mute:#5d6b78;--line:#d3dce4;--acc:#0f7f86;--accink:#fff;--ok:#1b7f4b;--err:#b83227;--code:#e6ecf1}
+@media (prefers-color-scheme:dark){:root{--bg:#10161c;--panel:#17202a;--ink:#e6edf3;--mute:#93a1ae;--line:#283541;--acc:#3cc1c8;--accink:#06262a;--ok:#4cc884;--err:#ff8174;--code:#1d2833}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:15px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;height:100vh;height:100dvh}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+h1{font-size:16px;margin:0 10px 0 0;font-weight:650}
+select,button,textarea,input{font:inherit;color:inherit}
+select,button{padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);cursor:pointer}
+button.primary{background:var(--acc);color:var(--accink);border-color:var(--acc);font-weight:600}
+button:disabled{opacity:.55;cursor:default}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#status{color:var(--mute);font-size:13px;flex:1;min-width:140px}
+#lbar{display:flex;gap:10px;align-items:center;padding:6px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+#lbar[hidden]{display:none}
+#lbar progress{flex:1;height:10px}
+#lmsg{font-size:12px;color:var(--mute);max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+main{flex:1;display:grid;grid-template-columns:minmax(300px,2fr) 3fr;min-height:0}
+section{display:flex;flex-direction:column;min-height:0;min-width:0}
+#chatcol{border-right:1px solid var(--line)}
+.tabs,.ltabs{display:flex;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line);align-items:center}
+.tabs button.on,.ltabs button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+#chatcol>div[id$=view]{display:none;flex:1;flex-direction:column;min-height:0}
+#chatcol[data-v=apps]>#libview{display:flex}
+#chatcol[data-v=chat]>#chatview{display:flex}
+.srch{padding:10px}
+#q{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+#list{flex:1;overflow:auto;padding:0 10px 10px;display:flex;flex-direction:column;gap:8px}
+.gh{font-weight:650;font-size:13px;color:var(--mute);margin-top:6px}
+.app{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:9px 11px;display:flex;flex-direction:column;gap:5px}
+.app .top{display:flex;gap:8px;align-items:center}
+.app .top b{flex:1}
+.app small{color:var(--mute)}
+.hint{margin:0;padding:8px 12px;font-size:12px;color:var(--mute);border-top:1px solid var(--line)}
+label.share{font-size:13px;color:var(--mute);display:flex;gap:6px;align-items:center;align-self:flex-start}
+#log{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.msg{padding:8px 11px;border-radius:8px;white-space:pre-wrap;word-break:break-word;max-width:95%}
+.user{align-self:flex-end;background:var(--acc);color:var(--accink)}
+.bot{background:var(--panel);border:1px solid var(--line)}
+.step{font-size:13px;color:var(--mute);border-left:3px solid var(--line);padding-left:8px}
+.step.err{color:var(--err);border-color:var(--err)}
+.step.ok{color:var(--ok);border-color:var(--ok)}
+form{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+textarea{flex:1;resize:none;height:54px;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+body[data-mode=demo] #form,body[data-mode=demo] #model,body[data-mode=demo] #mload{display:none}
+#view{flex:1;min-height:0}
+iframe{width:100%;height:100%;border:0;background:#fff}
+#code{display:none;height:100%;grid-template-columns:150px 1fr}
+#files{border-right:1px solid var(--line);overflow:auto;padding:6px}
+#files div{padding:5px 8px;border-radius:5px;cursor:pointer;font-size:13px}
+#files div.on{background:var(--code);font-weight:600}
+pre{margin:0;padding:12px;overflow:auto;background:var(--code);font:12.5px/1.5 ui-monospace,Consolas,monospace;height:100%;white-space:pre}
+#mnav{display:none}
+#dlg,#pub,.ov{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:14px;z-index:5}
+#dlg>div,#pub>div,.ov>div{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;width:min(720px,100%);height:min(80vh,560px);display:flex;flex-direction:column;gap:8px}
+#dlg textarea{flex:1;height:auto;font:12px/1.4 ui-monospace,Consolas,monospace}
+#dlg .row{display:flex;gap:8px;align-items:center}
+#pub>div{height:auto;max-height:92vh;overflow:auto}
+#pub input:not([type=checkbox]){padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.dots::after{content:'';animation:dt 1.2s steps(4) infinite}
+@keyframes dt{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
+@media (prefers-reduced-motion:reduce){.dots::after{animation:none;content:'…'}}
+.msg .step{margin-top:6px}
+#chatcol[data-v=code]>#codeview,#chatcol[data-v=blocks]>#blockview{display:flex}
+#paste{flex:1;height:auto;font:12px/1.4 ui-monospace,Consolas,monospace}
+.blk{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 8px;border-radius:8px;background:var(--panel);border:1px solid var(--line);border-left:8px solid var(--c)}
+.blk input,.blk select{padding:4px 6px;border:1px solid var(--line);border-radius:5px;background:var(--bg);min-width:0;flex:1}
+.blk b{font-size:13px}
+.pal{display:flex;flex-wrap:wrap;gap:6px;padding:10px}
+.pal button{border-left:6px solid var(--c);padding:4px 8px;font-size:13px}
+#ide{flex:1;display:grid;grid-template-columns:130px 1fr;min-height:0}
+#ex{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.exh{display:flex;gap:6px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--line);font-size:13px}
+.exh button{padding:3px 8px;font-size:12px}
+#exl{overflow:auto;padding:4px}
+#exl div{padding:5px 8px;border-radius:5px;cursor:pointer;font-size:13px;word-break:break-all}
+#exl div.on{background:var(--code);font-weight:600}
+#exl input{width:100%;padding:4px 6px;border:1px solid var(--acc);border-radius:5px;background:var(--bg)}
+#edw{display:flex;flex-direction:column;min-height:0;min-width:0}
+#ed{flex:1;height:auto;border:0;border-radius:0;font:12.5px/1.5 ui-monospace,Consolas,monospace;white-space:pre;overflow:auto;tab-size:2}
+#blockview{overflow:auto}
+#stagebox{padding:0 10px}
+#stage{position:relative;width:100%;border:1px solid var(--line);border-radius:6px;overflow:hidden;touch-action:none}
+.cel{position:absolute;transform:translate(-50%,-50%);cursor:grab;user-select:none;padding:2px 6px;border:1px dashed transparent;white-space:nowrap;color:#111}
+.cel.h1{font-size:22px;font-weight:700}.cel.p{font-size:14px}.cel.cnt{font-size:34px}.cel.img{font-size:40px}
+.cel.btn{background:#eee;border:1px solid #aaa;border-radius:8px;padding:6px 12px}
+.cel.inp{background:#fff;border:1px solid #aaa;border-radius:4px;padding:5px 10px;color:#777}
+.cel.sel{border-color:var(--acc);border-style:solid}
+#props{padding:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px}
+#props input,#props select{padding:5px 7px;border:1px solid var(--line);border-radius:5px;background:var(--bg);min-width:0}
+@media (min-width:801px){body[data-left=blocks] main{grid-template-columns:minmax(480px,60%) 1fr}}
+body[data-mode=demo] #editrow{display:none}
+#blockview{overflow:hidden}
+#bnote{padding:8px 10px;background:var(--code);font-size:13px}
+#spbar,#cats{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px 0}
+#spbar button.on,#cats button.on{background:var(--ink);color:var(--bg)}
+#spprops{display:flex;flex-wrap:wrap;gap:8px;padding:6px 10px;font-size:13px;align-items:center}
+#spprops input{padding:3px 6px;border:1px solid var(--line);border-radius:5px;background:var(--bg)}
+#bmain{flex:1;display:grid;grid-template-columns:minmax(170px,36%) 1fr;min-height:230px;border-top:1px solid var(--line);margin-top:8px}
+#pallist{overflow:auto;padding:8px;background:var(--code)}
+#pallist .blk{margin-bottom:6px}
+#pallist input,#pallist select{pointer-events:none}
+#pallist .vrow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+#pallist .vrow input{padding:4px 6px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);pointer-events:auto;flex:1;min-width:90px}
+#ws{position:relative;overflow:auto;background:var(--bg)}
+#ws .script{position:absolute}
+.blk{position:relative;background:var(--c);color:#fff;border-radius:6px;margin-top:2px;font-size:13px;width:max-content}
+.blk.hat{border-radius:18px 18px 6px 6px;padding-top:6px}
+.brow{display:flex;gap:5px;align-items:center;padding:6px 8px;cursor:grab;touch-action:none;white-space:nowrap}
+.brow input,.brow select{border:0;border-radius:10px;padding:2px 6px;background:#fff;color:#222;font-size:12px;min-width:2ch}
+.cin{margin-left:14px;min-height:24px;background:rgba(0,0,0,.14);border-radius:0 0 0 6px;padding:1px 0 4px 4px}
+.cfoot{height:10px}
+.ghost{position:fixed;z-index:50;pointer-events:none;opacity:.92}
+.dim{opacity:.35}
+.ov>div{height:auto;max-height:92vh;overflow:auto;width:min(560px,100%)}
+.ov input:not([type=checkbox]),.ov select{padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+body[data-view=home] header,body[data-view=home] main,body[data-view=home] #mnav,body[data-view=home] #lbar{display:none}
+body[data-view=editor] #home{display:none}
+#home{flex:1;overflow:auto}
+.hbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:3}
+.hbar input[type=search]{flex:1;min-width:160px;max-width:420px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+#hmain{max-width:1000px;margin:0 auto;padding:12px 16px}
+#hmain h2{font-size:16px;margin:18px 0 8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.sc{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.sc small{color:var(--mute)}
+.sc .acts{display:flex;gap:6px;flex-wrap:wrap}
+#vm>div{width:min(1000px,100%);height:90vh}
+#vm iframe{flex:1;border:1px solid var(--line);border-radius:6px;background:#fff}
+body:not([data-mode=cloud]) #aikey{display:none}
+body[data-mode=cloud] #model,body[data-mode=cloud] #mload{display:none}
+body[data-kind=site] #gameui{display:none}
+body[data-kind=game] #siteui{display:none}
+#gameui{display:flex;flex-direction:column;flex:1;min-height:0}
+#siteui{flex:1;overflow:auto}
+#sstagebox{padding:0 10px}
+#sstage{position:relative;width:100%;border:1px solid var(--line);border-radius:6px;overflow:hidden;touch-action:none}
+#sprops{padding:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px}
+#sprops input,#sprops select{padding:5px 7px;border:1px solid var(--line);border-radius:5px;background:var(--bg);min-width:0}
+.cel.box{width:70px;height:40px;padding:0;border-radius:8px}
+@media (max-width:800px){
+ main{grid-template-columns:1fr;grid-template-rows:1fr}
+ #mnav{display:flex;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--panel)}
+ #mnav button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+ .tabs{display:none}
+ #chatcol{border-right:0}
+ #code{grid-template-columns:100px 1fr}
+ body[data-pane=chat] #prevcol{display:none}
+ body:not([data-pane=chat]) #chatcol{display:none}
+}
+</style>
+</head>
+<body data-view="home" data-kind="game">
+<header>
+  <button id="hhome" type="button">← Start</button>
+  <h1>Bitbench</h1>
+  <select id="backend" aria-label="Modus">
+    <option value="demo">Demo (ohne Modell)</option>
+    <option value="local">Lokales Modell (WebGPU)</option>
+    <option value="claude">Claude (Anthropic)</option>
+    <option value="openai">ChatGPT (OpenAI)</option>
+    <option value="gemini">Gemini (Google)</option>
+  </select>
+  <select id="model" aria-label="Modell">
+    <option>Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC</option>
+    <option>Qwen2.5-Coder-3B-Instruct-q4f16_1-MLC</option>
+    <option>Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC</option>
+  </select>
+  <button id="mload" type="button" class="primary">Modell herunterladen</button>
+  <button id="aikey" type="button">KI-Schlüssel</button>
+  <span id="status">Bereit.</span>
+  <button id="reset" type="button">Neu</button>
+  <button id="sv" type="button">Speichern</button>
+  <button id="upl" type="button" class="primary">Hochladen</button>
+  <button id="pubb" type="button">Eigene GitHub-Seite</button>
+  <button id="dl" type="button">Offline speichern</button>
+  <button id="cp" type="button">Code kopieren</button>
+</header>
+<div id="lbar" hidden><progress id="pb" max="1" value="0"></progress><span id="lmsg"></span></div>
+<nav id="mnav"><button type="button" id="mh" class="on">Apps und Chat</button><button type="button" id="mp">Vorschau</button><button type="button" id="mc">Code</button></nav>
+<div id="home">
+  <div class="hbar"><b style="font-size:17px">Bitbench</b><input id="hq" type="search" placeholder="Webseiten und Spiele suchen …" aria-label="Suchen"><span style="flex:1"></span><button type="button" id="hserver">Server einrichten</button><button type="button" id="hcreate" class="primary">Erstellen</button><button type="button" id="hlogin">Anmelden</button></div>
+  <div id="hmain">
+    <p id="hnote" style="color:var(--mute);font-size:14px"></p>
+    <h2 id="htitle">Beliebteste</h2><div id="hgrid" class="grid"></div>
+    <div id="hmine" hidden><h2>Mein Bereich</h2><div id="hmygrid" class="grid"></div></div>
+    <h2>Beispiele zum Ausprobieren</h2><div id="hdemo" class="grid"></div>
+  </div>
+</div>
+<main>
+  <section id="chatcol" data-v="apps">
+    <div class="ltabs"><button type="button" id="ltc">KI</button><button type="button" id="lta" class="on">Apps</button><button type="button" id="ltd">Code</button><button type="button" id="ltb">Blöcke</button></div>
+    <div id="libview">
+      <div class="srch"><input id="q" type="search" placeholder="Apps suchen …" aria-label="Apps suchen"></div>
+      <div id="list"></div>
+      <p class="hint">Alle mit dem Modell gebauten Apps werden automatisch in diesem Browser gespeichert. Das Häkchen „Zur Verbesserung verwenden dürfen“ wird nur lokal vermerkt: Es gibt noch keinen Server, deshalb wird nichts gesendet.</p>
+    </div>
+    <div id="chatview">
+      <div id="log"></div>
+      <label class="share" id="editrow" style="padding:6px 10px"><input type="checkbox" id="editmode"> Aktuelle App ändern (sonst baut die KI eine neue App)</label>
+      <form id="form">
+        <textarea id="input" placeholder="Beschreib die App, die gebaut werden soll …" aria-label="Auftrag"></textarea>
+        <button class="primary" id="send">Senden</button>
+      </form>
+    </div>
+    <div id="codeview">
+      <div id="ide">
+        <div id="ex"><div class="exh"><b style="flex:1">Dateien</b><button type="button" id="nf" title="Neue Datei" aria-label="Neue Datei">+</button></div><div id="exl"></div></div>
+        <div id="edw"><div class="exh"><b id="edn" style="flex:1"></b><button type="button" id="edren">Umbenennen</button><button type="button" id="eddel">Löschen</button></div><textarea id="ed" spellcheck="false" aria-label="Editor"></textarea></div>
+      </div>
+    </div>
+    <div id="blockview">
+      <div id="gameui">
+      <div id="bnote" hidden>Ein Block-Projekt würde deinen aktuellen Code ersetzen. <button type="button" id="bstart">Block-Projekt starten</button></div>
+      <div id="spbar"></div>
+      <div id="spprops"></div>
+      <div id="cats"></div>
+      <div id="bmain"><div id="pallist"></div><div id="ws"></div></div>
+      <details style="padding:6px 10px;font-size:12px;color:var(--mute)"><summary style="cursor:pointer">Hilfe zu Blöcken und Feldern</summary>Ziehe Blöcke aus der Liste in den Arbeitsbereich, hake sie unten an andere Blöcke oder in Schleifen hinein, und zieh sie zum Löschen zurück in die Liste. Figuren verschiebst du direkt in der Vorschau. In Zahlen- und Bedingungsfeldern kannst du rechnen: Punkte + 1, zufall(1,10), x, y, richtung, größe, maus_x, maus_y, taste("a"), beruehrt("Katze"). In Textfeldern setzt {Punkte} den Wert einer Variable ein.</details>
+      </div>
+      <div id="siteui">
+        <div id="bnote2" hidden style="padding:8px 10px;background:var(--code);font-size:13px">Ein Block-Projekt würde deinen aktuellen Code ersetzen. <button type="button" id="bstart2">Block-Projekt starten</button></div>
+        <div class="pal" id="spal"></div>
+        <div id="sstagebox"><div id="sstage"></div></div>
+        <div id="sprops"></div>
+      </div>
+    </div>
+  </section>
+  <section id="prevcol">
+    <div class="tabs">
+      <button type="button" id="tp" class="on">Vorschau</button>
+      <button type="button" id="tc">Code</button>
+    </div>
+    <div id="view">
+      <iframe id="frame" sandbox="allow-scripts" title="Vorschau"></iframe>
+      <div id="code"><div id="files"></div><pre id="src"></pre></div>
+    </div>
+  </section>
+</main>
+<div id="dlg" role="dialog" aria-label="Code"><div>
+  <div class="row"><strong style="flex:1">Fertige App (eine HTML-Datei)</strong><button type="button" id="dcopy" class="primary">Alles kopieren</button><button type="button" id="dclose">Schließen</button></div>
+  <textarea id="dtext" readonly></textarea>
+  <span id="dmsg" style="font-size:13px;color:var(--mute)">Zum Speichern: kopieren und in eine Datei „app.html“ einfügen.</span>
+</div></div>
+<div id="pub" role="dialog" aria-label="Veröffentlichen"><div>
+  <strong>Auf GitHub veröffentlichen</strong>
+  <input id="pname" placeholder="Name der App" aria-label="Name der App">
+  <input id="pslug" placeholder="Name im Link, z. B. mein-spiel" aria-label="Name im Link">
+  <span id="pprev" style="font-size:13px;color:var(--mute)"></span>
+  <details id="gset"><summary style="cursor:pointer;font-size:13px">GitHub-Verbindung (einmal einrichten)</summary>
+    <p style="font-size:12px;color:var(--mute);margin:6px 0">1. Kostenloses Konto auf github.com anlegen. 2. <a href="https://github.com/settings/tokens/new?scopes=repo&description=Bitbench" target="_blank" rel="noopener">Token erstellen</a> (Haken bei „repo“, unten „Generate token“) und hier einfügen. Der Token bleibt nur in diesem Browser gespeichert, nutze ihn nur auf deinem eigenen Gerät.</p>
+    <input id="gtoken" type="password" placeholder="GitHub-Token (ghp_…)" aria-label="GitHub-Token" style="width:100%">
+    <input id="grepo" placeholder="Repository, z. B. meine-apps" aria-label="Repository" style="width:100%;margin-top:6px">
+  </details>
+  <label class="share"><input type="checkbox" id="pqr" checked> QR-Code erstellen</label>
+  <button type="button" id="pmake" class="primary">Veröffentlichen</button>
+  <input id="plink" readonly aria-label="Link">
+  <div id="pqrbox"></div>
+  <span id="pmsg" style="font-size:13px;color:var(--mute)">Die Adresse deiner Seite entsteht automatisch, du wählst nur den Namen im Link.</span>
+  <div style="display:flex;gap:8px"><button type="button" id="pcopy">Link kopieren</button><button type="button" id="pplat" title="Lädt diese Plattform als Startseite ins Repository">Plattform hochladen</button><button type="button" id="pclose">Schließen</button></div>
+</div></div>
+<div id="aid" class="ov" role="dialog" aria-label="KI verbinden"><div>
+  <strong>KI verbinden: <span id="aiprov"></span></strong>
+  <input id="aikeyf" type="password" placeholder="API-Schlüssel" aria-label="API-Schlüssel">
+  <input id="aimodel" placeholder="Modellname" aria-label="Modellname">
+  <span style="font-size:12px;color:var(--mute)">Der Schlüssel bleibt nur in diesem Browser und geht direkt an den Anbieter. Anfragen kosten Geld nach dem Tarif des Anbieters. Den aktuellen Modellnamen findest du in dessen Dokumentation.</span>
+  <div style="display:flex;gap:8px"><button type="button" id="aisave" class="primary">Speichern</button><button type="button" data-close>Schließen</button></div>
+</div></div>
+<div id="ad" class="ov" role="dialog" aria-label="Anmelden"><div>
+  <div style="display:flex;gap:6px"><button type="button" id="adin" class="primary">Anmelden</button><button type="button" id="adup">Registrieren</button></div>
+  <span id="adnote" style="font-size:13px;color:var(--mute)"></span>
+  <input id="adname" placeholder="Anzeigename" aria-label="Anzeigename">
+  <input id="ademail" type="email" placeholder="E-Mail" aria-label="E-Mail">
+  <input id="adpw" type="password" placeholder="Passwort (mindestens 6 Zeichen)" aria-label="Passwort">
+  <button type="button" id="adgo" class="primary">Weiter</button>
+  <span id="admsg" style="font-size:13px;color:var(--mute)"></span>
+  <button type="button" data-close>Schließen</button>
+</div></div>
+<div id="sd" class="ov" role="dialog" aria-label="Server einrichten"><div>
+  <strong>Server einrichten (Supabase, kostenlos)</strong>
+  <input id="surl" placeholder="Projekt-URL, z. B. https://abc.supabase.co" aria-label="Projekt-URL">
+  <input id="skey" placeholder="Öffentlicher Schlüssel (anon oder publishable)" aria-label="Schlüssel">
+  <textarea readonly aria-label="SQL" style="width:100%;height:210px;flex:none;font:11px/1.4 ui-monospace,Consolas,monospace">create table sites (
+  id uuid primary key default gen_random_uuid(),
+  slug text unique not null,
+  title text not null,
+  kind text not null check (kind in ('game','site')),
+  html text not null check (length(html) < 500000),
+  project jsonb,
+  owner uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  owner_name text,
+  status text not null default 'approved' check (status in ('approved','rejected')),
+  ai_note text,
+  views int not null default 0,
+  created_at timestamptz default now()
+);
+alter table sites enable row level security;
+create policy "freigegebene sehen" on sites for select using (status = 'approved' or owner = auth.uid());
+create policy "eigene anlegen" on sites for insert with check (owner = auth.uid());
+create policy "eigene aendern" on sites for update using (owner = auth.uid()) with check (owner = auth.uid());
+create policy "eigene loeschen" on sites for delete using (owner = auth.uid());
+create function view_site(s text) returns void language sql security definer as $$ update sites set views = views + 1 where slug = s and status = 'approved' $$;
+grant execute on function view_site(text) to anon, authenticated;</textarea>
+  <span style="font-size:12px;color:var(--mute)">Den SQL-Text einmal im Supabase-SQL-Editor ausführen. Unter Authentication kannst du „Confirm email“ ausschalten, dann klappt die Registrierung sofort.</span>
+  <div style="display:flex;gap:8px"><button type="button" id="ssave" class="primary">Speichern</button><button type="button" data-close>Schließen</button></div>
+</div></div>
+<div id="cd" class="ov" role="dialog" aria-label="Erstellen"><div>
+  <strong>Was möchtest du erstellen?</strong>
+  <button type="button" id="cgame" class="primary" style="padding:14px">🎮 Spiel (Blöcke wie bei Scratch)</button>
+  <button type="button" id="csite" class="primary" style="padding:14px">🌐 Webseite (Elemente frei platzieren)</button>
+  <button type="button" data-close>Abbrechen</button>
+</div></div>
+<div id="up" class="ov" role="dialog" aria-label="Hochladen"><div>
+  <strong>Auf die Plattform hochladen</strong>
+  <input id="upt" placeholder="Titel" aria-label="Titel">
+  <span id="upmsg" style="font-size:13px;color:var(--mute)"></span>
+  <input id="uplink" readonly aria-label="Link" placeholder="Der Link erscheint nach dem Hochladen">
+  <div style="display:flex;gap:8px"><button type="button" id="upgo" class="primary">Prüfen und hochladen</button><button type="button" data-close>Schließen</button></div>
+</div></div>
+<div id="vm" class="ov" role="dialog" aria-label="Ansehen"><div>
+  <div style="display:flex;align-items:center;gap:8px"><b id="vt" style="flex:1"></b><button type="button" data-close>Schließen</button></div>
+  <iframe id="vframe" sandbox="allow-scripts" title="App"></iframe>
+</div></div>
+<script>
+const b64u = u => { let s = ''; for (const x of u) s += String.fromCharCode(x); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+const unb64u = t => Uint8Array.from(atob(t.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+async function pack(o) {
+  const raw = new TextEncoder().encode(JSON.stringify(o));
+  try { return '1' + b64u(new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer())); }
+  catch (e) { return '0' + b64u(raw); }
+}
+async function unpack(t) {
+  let u = unb64u(t.slice(1));
+  if (t[0] === '1') u = new Uint8Array(await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+  return JSON.parse(new TextDecoder().decode(u));
+}
+const sbHead = k => { const h = { apikey: k }; if (k.startsWith('eyJ')) h.Authorization = 'Bearer ' + k; return h; };
+async function viewer() {
+  let o;
+  try {
+    const h = location.hash;
+    if (h.startsWith('#app=')) { const d = h.slice(5), i = d.indexOf('~'); o = await unpack(i >= 0 ? d.slice(i + 1) : d); }
+    else {
+      const q = new URLSearchParams(h.slice(1));
+      const r = await fetch(q.get('u') + '/rest/v1/sites?select=name,html&slug=eq.' + encodeURIComponent(q.get('s')), { headers: sbHead(q.get('k') || '') });
+      const j = await r.json();
+      if (!j[0]) throw new Error('nicht gefunden');
+      o = { n: j[0].name, h: j[0].html };
+    }
+  } catch (e) { document.body.textContent = 'Dieser Link ist ungültig, beschädigt oder die App wurde nicht gefunden.'; return; }
+  document.title = o.n || 'App';
+  document.body.innerHTML = '<iframe id="vf" sandbox="allow-scripts allow-forms allow-popups allow-modals" title="App" style="flex:1;width:100%;border:0;background:#fff"></iframe><div style="display:flex;gap:10px;align-items:center;padding:8px 12px;background:var(--panel);border-top:1px solid var(--line);font-size:13px"><b id="vn" style="flex:1"></b><button id="vdl" type="button">Als Offline-App speichern</button></div>';
+  document.getElementById('vn').textContent = o.n || 'App';
+  document.getElementById('vf').srcdoc = o.h;
+  document.getElementById('vdl').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([o.h], { type: 'text/html' })); a.download = (o.n || 'app') + '.html'; a.click(); };
+}
+if (!/^#(app|s)=/.test(location.hash)) {
+const $ = s => document.querySelector(s);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const log = $('#log');
+const KEY = 'miniagent.apps.v1';
+let files = {}, history = [], engine = null, loading = null, busy = false, errors = [], current = '', view = 'p';
+let currentId = null, apps = [], storageOk = true, demoKind = '', demoBug = false, gpuF16 = null, projSrc = 'ki', lastFinish = '', projKind = 'game', CFG = { url: '', key: '' }, sess = null, curSite = null;
+let proj = { name: 'Meine Block-App', bg: '#cfe8ff', vars: ['Punkte'], sprites: [{ id: 's1', n: 'Katze', e: '😺', x: 0, y: 0, dir: 90, size: 100, scripts: [
+  { x: 16, y: 16, b: [{ o: 'flag', a: [] }, { o: 'goto', a: [0, 0] }, { o: 'repeat', a: [36], c: [{ o: 'move', a: [10] }, { o: 'turnr', a: [10] }] }] },
+  { x: 16, y: 190, b: [{ o: 'click', a: [] }, { o: 'chvar', a: ['Punkte', 1] }, { o: 'sayfor', a: ['Punkte: {Punkte}', 1] }, { o: 'showvar', a: ['Punkte'] }] }] }] }, selSp = 0, catSel = 'ev';
+
+const FENCE = '`'.repeat(3);
+const SYSTEM = 'You are a coding agent that builds small web apps and games. Build exactly what the task asks for, nothing else. Answer with ONE short sentence in German, then ONE complete HTML file inside a markdown code block. Put all CSS in a <style> tag and all JavaScript in a <script> tag of that file. No external libraries, no placeholders, never skip code. Keep the code compact (at most about 120 lines) and end the file with </html>. Make sure something is visible right away, never leave the page empty. The format example below only shows the structure, never copy its content.\nFormat example:\n' + FENCE + 'html\n<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Titel</title><style>body{margin:0}</style></head><body><div id="app"></div><script>document.getElementById("app").textContent="Beispiel";<\/script></body></html>\n' + FENCE + '\nIf the message contains "Current code", change that code as the task says and return the whole updated file. If it contains "Runtime error", fix that error and return the whole corrected file.';
+
+const BUILTIN = [
+  { kind: 'zaehler', name: 'Zähler', desc: 'Hoch- und runterzählen', prompt: 'Baue einen Zähler' },
+  { kind: 'todo', name: 'To-do-Liste', desc: 'Aufgaben hinzufügen, abhaken und löschen', prompt: 'Baue eine To-do-Liste' },
+  { kind: 'uhr', name: 'Stoppuhr', desc: 'Start, Stopp und Zurücksetzen', prompt: 'Baue eine Stoppuhr' },
+  { kind: 'rechner', name: 'Rechner', desc: 'Zwei Zahlen verrechnen', prompt: 'Baue einen Rechner' },
+  { kind: 'wuerfel', name: 'Würfel', desc: 'Würfelt eine Zahl von 1 bis 6', prompt: 'Baue einen Würfel' },
+  { kind: 'zaehler', bug: true, name: 'Zähler mit Fehler', desc: 'Zeigt, wie der Agent einen Fehler findet und korrigiert (Details im Tab „Chat“)', prompt: 'Baue einen Zähler mit Fehler' }
+];
+
+function add(cls, text) {
+  const d = document.createElement('div');
+  d.className = cls; d.textContent = text;
+  log.appendChild(d); log.scrollTop = log.scrollHeight;
+  return d;
+}
+const setStatus = t => { $('#status').textContent = t; };
+const dump = () => Object.entries(files).map(([p, c]) => `<file path="${p}">\n${c}\n</file>`).join('\n');
+const short = t => t.replace(/```[\s\S]*?(```|$)/g, '[Code]').trim();
+const mobile = () => matchMedia('(max-width:800px)').matches;
+
+/* ---------- Speicher ---------- */
+function loadApps() { try { apps = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { apps = []; storageOk = false; } }
+function saveApps() { try { localStorage.setItem(KEY, JSON.stringify(apps)); return true; } catch (e) { storageOk = false; return false; } }
+
+/* ---------- Demo-Backend ---------- */
+function demoHtml(kind, bug) {
+  const page = (title, body, css, js) => '<!DOCTYPE html>\n<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + title + '</title><style>\nbody{font-family:system-ui,sans-serif;max-width:420px;margin:8vh auto;padding:0 16px;text-align:center}button,input{font-size:18px;padding:10px 14px;border-radius:10px;border:1px solid #bbb}button{cursor:pointer}' + css + '\n</style></head>\n<body>' + body + '\n<script>\n' + js + (bug ? '\naktualisiere();' : '') + '\n<\/script></body></html>';
+  if (kind === 'todo') return page('To-do-Liste', '<h1>To-do-Liste</h1><p><input id="t" placeholder="Neue Aufgabe"> <button id="add">Hinzufügen</button></p><ul id="l" style="list-style:none;padding:0;text-align:left"></ul>', '', 'const l=document.getElementById("l"),t=document.getElementById("t"),b=document.getElementById("add");function neu(text){const li=document.createElement("li");li.style.cssText="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #ddd";const s=document.createElement("span");s.textContent=text;s.onclick=()=>{s.style.textDecoration=s.style.textDecoration?"":"line-through"};const x=document.createElement("button");x.textContent="×";x.onclick=()=>li.remove();li.append(s,x);l.appendChild(li)}b.onclick=()=>{if(t.value.trim()){neu(t.value.trim());t.value=""}};t.onkeydown=e=>{if(e.key==="Enter")b.click()};');
+  if (kind === 'uhr') return page('Stoppuhr', '<h1>Stoppuhr</h1><div id="z">0.0</div><button id="s">Start</button> <button id="r">Zurücksetzen</button>', '#z{font-size:64px;margin:16px}', 'let t=0,id=null;const z=document.getElementById("z");document.getElementById("s").onclick=function(){if(id){clearInterval(id);id=null;this.textContent="Start"}else{id=setInterval(()=>{t+=0.1;z.textContent=t.toFixed(1)},100);this.textContent="Stopp"}};document.getElementById("r").onclick=()=>{t=0;z.textContent="0.0"};');
+  if (kind === 'rechner') return page('Rechner', '<h1>Rechner</h1><p><input id="a" type="number" style="width:30%"> <select id="o" style="font-size:18px;padding:10px"><option>+</option><option>−</option><option>×</option><option>÷</option></select> <input id="b" type="number" style="width:30%"></p><button id="g">Rechnen</button><div id="e" style="font-size:40px;margin:20px"></div>', '', 'document.getElementById("g").onclick=()=>{const a=+document.getElementById("a").value,b=+document.getElementById("b").value,o=document.getElementById("o").value;const r={"+":a+b,"−":a-b,"×":a*b,"÷":b===0?"geteilt durch 0 geht nicht":a/b}[o];document.getElementById("e").textContent=r};');
+  if (kind === 'wuerfel') return page('Würfel', '<h1>Würfel</h1><div id="w">⚀</div><button id="g">Würfeln</button>', '#w{font-size:96px;margin:12px}', 'const f=["⚀","⚁","⚂","⚃","⚄","⚅"];document.getElementById("g").onclick=()=>{document.getElementById("w").textContent=f[Math.floor(Math.random()*6)]};');
+  return page('Zähler', '<h1>Zähler</h1><div id="n">0</div><button id="minus">−</button> <button id="plus">+</button>', '#n{font-size:72px;margin:16px}', 'let n=0;const el=document.getElementById("n");function zeige(){el.textContent=n}document.getElementById("plus").onclick=()=>{n++;zeige()};document.getElementById("minus").onclick=()=>{n--;zeige()};');
+}
+
+async function demo(messages, onToken) {
+  const fix = messages[messages.length - 1].content.startsWith('Runtime error');
+  if (fix) demoBug = false;
+  const intro = fix ? 'Die Funktion „aktualisiere“ gab es nicht, ich habe den Aufruf entfernt.'
+    : 'Hier ist die App (Demo-Modus, ohne KI-Modell).' + (demoBug ? ' Sie enthält absichtlich einen Fehler.' : '');
+  const text = intro + '\n' + FENCE + 'html\n' + demoHtml(demoKind, demoBug) + '\n' + FENCE;
+  for (let i = 0; i < text.length; i += 80) { onToken(text.slice(0, i + 80)); await sleep(15); }
+  return text;
+}
+
+/* ---------- Lokales Modell (WebGPU) ---------- */
+const gpuHint = e => /shader|webgpu|gpu/i.test(String(e.message || e)) ? '\nTipp: Nimm das kleinste Modell (1.5B), aktualisiere Chrome oder Edge oder benutze den Demo-Modus.' : '';
+
+async function checkGpu() {
+  try {
+    const ad = navigator.gpu && await navigator.gpu.requestAdapter();
+    gpuF16 = !!(ad && ad.features.has('shader-f16'));
+  } catch (e) { gpuF16 = false; }
+  if (!gpuF16) [...$('#model').options].forEach(o => { o.textContent = o.textContent.replace('q4f16_1', 'q4f32_1'); });
+}
+
+async function loadModel() {
+  if (!navigator.gpu) throw new Error('Dieser Browser hat kein WebGPU. Nimm ein aktuelles Chrome oder Edge am Computer.');
+  if (gpuF16 === null) await checkGpu();
+  $('#lbar').hidden = false; $('#pb').value = 0; $('#lmsg').textContent = 'Lade Bibliothek …';
+  let webllm;
+  try { webllm = await import('https://esm.run/@mlc-ai/web-llm'); }
+  catch (e) { throw new Error('Die Bibliothek konnte nicht geladen werden. Du brauchst Internet, und es klappt nicht in der Chat-Vorschau: Öffne die Datei direkt im Browser.'); }
+  let coder = webllm.prebuiltAppConfig.model_list.map(m => m.model_id).filter(id => /coder/i.test(id));
+  const fit = coder.filter(id => gpuF16 ? /q4f16/.test(id) : /q4f32/.test(id));
+  if (fit.length) coder = fit;
+  if (coder.length) {
+    const sel = $('#model'), old = sel.value;
+    sel.innerHTML = coder.map(id => `<option>${id}</option>`).join('');
+    if (coder.includes(old)) sel.value = old;
+  }
+  const progress = r => {
+    const p = r.progress || 0;
+    $('#pb').value = p;
+    $('#lmsg').textContent = Math.round(p * 100) + ' % – ' + r.text;
+    setStatus('Modell wird geladen …');
+  };
+  try {
+    engine = await webllm.CreateMLCEngine($('#model').value, { initProgressCallback: progress });
+  } catch (e) {
+    const id = $('#model').value;
+    if (/shader/i.test(String(e.message || e)) && id.includes('q4f16')) {
+      const alt = id.replace('q4f16_1', 'q4f32_1'), sel = $('#model');
+      $('#lmsg').textContent = 'Fehler mit der 16-Bit-Variante, versuche die 32-Bit-Variante …';
+      if (![...sel.options].some(o => o.value === alt)) sel.add(new Option(alt));
+      sel.value = alt;
+      engine = await webllm.CreateMLCEngine(alt, { initProgressCallback: progress });
+    } else throw e;
+  }
+  setStatus('Modell bereit.');
+}
+
+function ensureModel() {
+  if (engine) return Promise.resolve();
+  if (loading) return loading;
+  const b = $('#mload'); b.disabled = true; b.textContent = 'Lädt …';
+  loading = loadModel()
+    .then(() => { b.textContent = 'Modell bereit'; })
+    .catch(e => { b.disabled = false; b.textContent = 'Modell herunterladen'; throw e; })
+    .finally(() => { loading = null; $('#lbar').hidden = true; });
+  return loading;
+}
+
+async function ask(messages, onToken, demoOnly) {
+  const mode = demoOnly ? 'demo' : $('#backend').value;
+  lastFinish = '';
+  if (mode === 'demo') return demo(messages, onToken);
+  if (mode !== 'local') { const t = await cloud(mode, messages); onToken(t); return t; }
+  await ensureModel();
+  const stream = await engine.chat.completions.create({ messages, stream: true, temperature: 0.2, max_tokens: 3000 });
+  let out = '';
+  for await (const c of stream) { out += c.choices[0]?.delta?.content || ''; const fr = c.choices[0]?.finish_reason; if (fr) lastFinish = fr; onToken(out); }
+  return out;
+}
+
+const aiCfg = () => { try { return JSON.parse(localStorage.getItem('miniagent.ai') || '{}'); } catch (e) { return {}; } };
+const AIDEF = { claude: 'claude-sonnet-5-5', openai: 'gpt-4o-mini', gemini: 'gemini-flash-latest' };
+const AINAME = { claude: 'Claude', openai: 'ChatGPT', gemini: 'Gemini' };
+const aiErr = (j, r) => (j && j.error && (j.error.message || j.error.type || String(j.error))) || 'Status ' + r.status;
+async function cloud(mode, messages, maxTok) {
+  const c = aiCfg()[mode] || {};
+  if (!c.key) throw new Error('Für ' + AINAME[mode] + ' fehlt der API-Schlüssel (Knopf „KI-Schlüssel“).');
+  const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n'), msgs = messages.filter(m => m.role !== 'system'), model = c.model || AIDEF[mode];
+  const J = { 'content-type': 'application/json' };
+  let r, j;
+  if (mode === 'claude') {
+    r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { ...J, 'x-api-key': c.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }, body: JSON.stringify({ model, max_tokens: maxTok || 8000, system: sys, messages: msgs }) });
+    j = await r.json(); if (!r.ok) throw new Error(aiErr(j, r));
+    lastFinish = j.stop_reason === 'max_tokens' ? 'length' : '';
+    return (j.content || []).map(p => p.text || '').join('');
+  }
+  if (mode === 'openai') {
+    r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { ...J, Authorization: 'Bearer ' + c.key }, body: JSON.stringify({ model, messages }) });
+    j = await r.json(); if (!r.ok) throw new Error(aiErr(j, r));
+    const ch = j.choices[0]; lastFinish = ch.finish_reason === 'length' ? 'length' : '';
+    return ch.message.content || '';
+  }
+  r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent', { method: 'POST', headers: { ...J, 'x-goog-api-key': c.key }, body: JSON.stringify({ systemInstruction: { parts: [{ text: sys }] }, contents: msgs.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })) }) });
+  j = await r.json(); if (!r.ok) throw new Error(aiErr(j, r));
+  const cd = (j.candidates || [])[0] || {}; lastFinish = cd.finishReason === 'MAX_TOKENS' ? 'length' : '';
+  return ((cd.content || {}).parts || []).map(p => p.text || '').join('');
+}
+async function llmOnce(messages, maxTok) {
+  const mode = $('#backend').value;
+  if (mode === 'demo') throw new Error('Es ist keine KI verbunden.');
+  if (mode !== 'local') return cloud(mode, messages, maxTok);
+  await ensureModel();
+  const r = await engine.chat.completions.create({ messages, temperature: 0.2, max_tokens: maxTok || 400 });
+  return r.choices[0].message.content || '';
+}
+const aiReady = () => { const m = $('#backend').value; return m === 'local' ? !!engine : m !== 'demo' && !!(aiCfg()[m] || {}).key; };
+
+async function nameApp(prompt) {
+  try {
+    const n = (await llmOnce([{ role: 'user', content: 'Gib dieser Web-App einen kurzen Namen mit höchstens drei Wörtern. Antworte nur mit dem Namen, ohne Satzzeichen.\nBeschreibung: ' + prompt }], 20)).replace(/["„“”'.\n]/g, '').trim().slice(0, 40);
+    if (n) return n;
+  } catch (e) { /* Rückfall unten */ }
+  return prompt.slice(0, 40);
+}
+
+/* ---------- Dateien und Vorschau ---------- */
+function extractCode(t) {
+  const m = /```(?:html)?[ \t]*\n([\s\S]*?)```/i.exec(t) || /```(?:html)?[ \t]*\n([\s\S]*)$/i.exec(t);
+  let c = m ? m[1] : '';
+  if (!/<\w/.test(c)) {
+    c = '';
+    const i = t.search(/<!DOCTYPE html|<html/i);
+    if (i >= 0) { c = t.slice(i); const j = c.toLowerCase().lastIndexOf('</html>'); if (j >= 0) c = c.slice(0, j + 7); }
+  }
+  return c.trim();
+}
+const isComplete = c => /<\/html>\s*$/i.test(c) && (c.match(/<script/gi) || []).length <= (c.match(/<\/script/gi) || []).length;
+function applyFiles(text) {
+  const c = extractCode(text);
+  if (!/<\w/.test(c)) return 0;
+  files['index.html'] = c; current = 'index.html'; projSrc = 'ki'; drawFiles();
+  return 1;
+}
+
+function bundle(ex) {
+  if (ex && projSrc === 'blocks' && projKind === 'game') return scratchPage(proj, false);
+  let h = files['index.html'] || '';
+  h = h.replace(/<link[^>]+href=["']([^"']+)["'][^>]*>/gi, (m, p) => files[p] != null ? `<style>${files[p]}</style>` : m);
+  h = h.replace(/<script([^>]*)src=["']([^"']+)["']([^>]*)><\/script>/gi,
+    (m, a, p) => files[p] != null ? `<script>${files[p].replace(/<\/script/gi, '<\\/script')}<\/script>` : m);
+  return h;
+}
+
+const HOOK = `<script>addEventListener('error',e=>parent.postMessage({agentErr:e.message+' (Zeile '+e.lineno+')'},'*'));addEventListener('unhandledrejection',e=>parent.postMessage({agentErr:String(e.reason)},'*'));addEventListener('load',()=>setTimeout(()=>{const b=document.body;if(!b||(!('innerText' in b?b.innerText:b.textContent).trim()&&!b.querySelector('canvas,svg,img,video,iframe,input,button,textarea,select,table')))parent.postMessage({agentErr:'Die Seite ist leer (weiß): Es wird nichts angezeigt.'},'*')},700));<\/script>`;
+
+function render() {
+  let h = bundle();
+  h = /<head[^>]*>/i.test(h) ? h.replace(/<head[^>]*>/i, m => m + HOOK) : HOOK + h;
+  $('#frame').srcdoc = h;
+}
+addEventListener('message', e => {
+  const m = e.data || {};
+  if (m.agentErr) errors.push(m.agentErr);
+  if (m.pos) { const q = proj.sprites.find(z => z.id === m.pos[0]); if (q) { q.x = m.pos[1]; q.y = m.pos[2]; drawBlocks(); } }
+});
+
+function drawFiles() {
+  $('#files').innerHTML = '';
+  Object.keys(files).forEach(p => {
+    const d = document.createElement('div');
+    d.textContent = p; d.className = p === current ? 'on' : '';
+    d.onclick = () => { current = p; drawFiles(); };
+    $('#files').appendChild(d);
+  });
+  $('#src').textContent = files[current] || '';
+}
+
+function tab(t) {
+  if (t !== 'h') view = t;
+  document.body.dataset.pane = t === 'h' ? 'chat' : 'prev';
+  $('#frame').style.display = view === 'p' ? 'block' : 'none';
+  $('#code').style.display = view === 'c' ? 'grid' : 'none';
+  $('#tp').classList.toggle('on', view === 'p');
+  $('#tc').classList.toggle('on', view === 'c');
+  $('#mh').classList.toggle('on', t === 'h');
+  $('#mp').classList.toggle('on', t !== 'h' && view === 'p');
+  $('#mc').classList.toggle('on', t !== 'h' && view === 'c');
+}
+$('#tp').onclick = $('#mp').onclick = () => tab('p');
+$('#tc').onclick = $('#mc').onclick = () => tab('c');
+$('#mh').onclick = () => tab('h');
+
+function setLeft(v) {
+  $('#chatcol').dataset.v = v; document.body.dataset.left = v;
+  [['lta', 'apps'], ['ltc', 'chat'], ['ltd', 'code'], ['ltb', 'blocks']].forEach(([i, k]) => $('#' + i).classList.toggle('on', v === k));
+}
+$('#lta').onclick = () => setLeft('apps');
+$('#ltc').onclick = () => setLeft('chat');
+$('#ltd').onclick = () => { setLeft('code'); starter(); drawIde(); };
+$('#ltb').onclick = () => { setLeft('blocks'); blocksOpen(); };
+
+function applyMode() {
+  const v = $('#backend').value, local = v === 'local';
+  document.body.dataset.mode = v === 'demo' ? 'demo' : (local ? 'local' : 'cloud');
+  setLeft(v === 'demo' ? 'apps' : 'chat');
+  setStatus(local ? (navigator.gpu ? 'WebGPU ist verfügbar' + (gpuF16 === false ? ' (ohne 16-Bit-Shader, ich nehme die kompatible Modellvariante)' : '') + '. Lade zuerst das Modell.' : 'Dieser Browser hat kein WebGPU.') : v === 'demo' ? 'Bereit.' : ((aiCfg()[v] || {}).key ? AINAME[v] + ' ist verbunden.' : 'Trag den API-Schlüssel für ' + AINAME[v] + ' ein (Knopf „KI-Schlüssel“).'));
+  if (v !== 'demo' && !local && !(aiCfg()[v] || {}).key) openAi();
+}
+$('#backend').onchange = applyMode;
+
+/* ---------- Bibliothek ---------- */
+function shareRow(a) {
+  const l = document.createElement('label'); l.className = 'share';
+  const c = document.createElement('input'); c.type = 'checkbox'; c.checked = !!a.share;
+  c.onchange = () => { a.share = c.checked; saveApps(); };
+  l.append(c, ' Zur Verbesserung verwenden dürfen');
+  return l;
+}
+
+function card(a, builtin) {
+  const d = document.createElement('div'); d.className = 'app';
+  const top = document.createElement('div'); top.className = 'top';
+  const n = document.createElement('b'); n.textContent = a.name;
+  const open = document.createElement('button'); open.type = 'button'; open.textContent = 'Öffnen';
+  open.onclick = () => builtin ? openDemo(a) : openApp(a);
+  top.append(n, open); d.appendChild(top);
+  const s = document.createElement('small');
+  s.textContent = builtin ? a.desc : (a.prompt || '').slice(0, 80);
+  d.appendChild(s);
+  if (!builtin) {
+    d.appendChild(shareRow(a));
+    const del = document.createElement('button'); del.type = 'button'; del.textContent = 'Löschen'; del.style.alignSelf = 'flex-start';
+    del.onclick = () => {
+      if (del.dataset.s) { apps = apps.filter(x => x.id !== a.id); if (currentId === a.id) currentId = null; saveApps(); drawLib(); }
+      else { del.dataset.s = '1'; del.textContent = 'Wirklich löschen?'; setTimeout(() => { del.dataset.s = ''; del.textContent = 'Löschen'; }, 3000); }
+    };
+    d.appendChild(del);
+  }
+  return d;
+}
+
+function drawLib() {
+  const q = $('#q').value.trim().toLowerCase();
+  const match = a => !q || (a.name + ' ' + (a.desc || '') + ' ' + (a.prompt || '')).toLowerCase().includes(q);
+  const mine = apps.filter(match), demos = BUILTIN.filter(match);
+  const box = $('#list'); box.innerHTML = '';
+  if (!mine.length && !demos.length) { box.textContent = 'Keine App gefunden.'; return; }
+  const head = t => { const h = document.createElement('div'); h.className = 'gh'; h.textContent = t; box.appendChild(h); };
+  if (mine.length) head('Meine Apps (mit dem Modell gebaut)');
+  mine.forEach(a => box.appendChild(card(a, false)));
+  if (demos.length) head('Demo-Apps');
+  demos.forEach(a => box.appendChild(card(a, true)));
+}
+$('#q').oninput = drawLib;
+
+function openApp(a) {
+  if (busy) return;
+  files = { ...a.files }; currentId = a.id; history = []; errors = [];
+  current = files['index.html'] ? 'index.html' : (Object.keys(files)[0] || '');
+  projSrc = a.src || 'ki';
+  if (a.blocks && (a.blocks.proj || a.blocks.els)) {
+    if (a.blocks.els) { projKind = 'site'; els = JSON.parse(JSON.stringify(a.blocks.els)); bgc = a.blocks.bgc || '#ffffff'; sel = -1; } else { projKind = 'game'; proj = JSON.parse(JSON.stringify(a.blocks.proj)); selSp = 0; }
+    document.body.dataset.kind = projKind; setLeft('blocks'); blocksOpen();
+  }
+  drawFiles(); drawIde(); render(); setStatus('Geöffnet: ' + a.name); tab('p');
+}
+
+function openDemo(b) {
+  if (busy) return;
+  files = {}; history = []; currentId = null; demoKind = b.kind; demoBug = !!b.bug;
+  tab('p'); run(b.prompt, true);
+}
+
+async function saveCurrent(prompt) {
+  let a = apps.find(x => x.id === currentId);
+  if (!a) {
+    add('step', 'Die App bekommt einen Namen.');
+    a = { id: 'a' + Date.now(), name: '', prompt, created: Date.now(), share: false, files: {} };
+    a.name = await nameApp(prompt);
+    apps.unshift(a); currentId = a.id;
+  }
+  a.files = { ...files }; a.updated = Date.now();
+  const ok = saveApps(); drawLib();
+  add('step ok', 'Gespeichert als „' + a.name + '“' + (ok ? '.' : ', aber nur bis zum Schließen: Speichern im Browser ist hier blockiert. Öffne die Datei direkt im Browser.'));
+  log.appendChild(shareRow(a));
+  log.scrollTop = log.scrollHeight;
+}
+
+/* ---------- Agenten-Schleife ---------- */
+function build(content) {
+  const fix = content.startsWith('Runtime error'), edit = fix || $('#editmode').checked;
+  const code = edit && files['index.html'] ? '\n\nCurrent code:\n' + FENCE + 'html\n' + files['index.html'] + '\n' + FENCE : '';
+  const task = fix ? content : 'Task: ' + content + (code ? '\nChange the current code as the task says.' : '\nBuild this as a NEW app from scratch.');
+  return [{ role: 'system', content: SYSTEM }, ...(edit ? history.slice(-6) : []), { role: 'user', content: task + code }];
+}
+
+function live(b, t) {
+  const i = t.indexOf('```');
+  b.querySelector('.bt').textContent = short(t);
+  b.querySelector('.bs').textContent = i >= 0 ? 'Programmiert index.html (' + t.length + ' Zeichen)' : 'Der Agent denkt nach';
+  setStatus('Programmiert … ' + t.length + ' Zeichen');
+  if (i >= 0) { const pre = $('#src'); pre.textContent = t.slice(i).replace(/^```\w*[ \t]*\n?/, '').replace(/```[\s\S]*$/, ''); pre.scrollTop = pre.scrollHeight; }
+  log.scrollTop = log.scrollHeight;
+}
+
+async function run(userText, demoOnly) {
+  busy = true; $('#send').disabled = true; projSrc = 'ki';
+  add('msg user', userText);
+  let content = userText, ok = false;
+  try {
+    for (let attempt = 0; attempt <= 2; attempt++) {
+      const bubble = add('msg bot', '');
+      bubble.innerHTML = '<span class="bt"></span><div class="step"><span class="bs">Der Agent denkt nach</span><span class="dots"></span></div>';
+      if (!mobile()) tab('c');
+      const reply = await ask(build(content), t => live(bubble, t), demoOnly);
+      bubble.textContent = short(reply) || '(keine Textantwort)';
+      const code0 = extractCode(reply);
+      if (!demoOnly && attempt < 2 && code0 && (lastFinish === 'length' || !isComplete(code0))) {
+        add('step', lastFinish === 'length' ? 'Die Antwort war zu lang und wurde abgeschnitten. Ich bitte um eine kürzere Version.' : 'Der Code ist unvollständig. Ich bitte um eine vollständige, kürzere Version.');
+        content = userText + '\nYour last answer was cut off or incomplete. Write a MUCH shorter and simpler version (under 100 lines): one complete HTML file that ends with </html>.';
+        continue;
+      }
+      const n = applyFiles(reply);
+      if (!n) {
+        if (attempt < 2) { add('step', 'Keine Code-Antwort erhalten, ich frage noch einmal.'); content = userText + '\nAnswer ONLY with one short sentence and one complete HTML file in a ' + FENCE + 'html code block.'; continue; }
+        add('step err', 'Auch nach drei Versuchen kam kein Code zurück. Probier einen kürzeren Auftrag, ein größeres Modell oder drück „Neu“.'); break;
+      }
+      if (attempt === 0) history.push({ role: 'user', content: userText }, { role: 'assistant', content: short(reply) || 'Done.' });
+      add('step', 'index.html geschrieben, starte Vorschau.');
+      errors = []; render(); if (!mobile()) tab('p'); await sleep(1200);
+      if (!errors.length) { ok = true; add('step ok', 'Die App läuft ohne Fehler.'); setStatus('App fertig.'); if (!demoOnly && !$('#editmode').checked) add('step', 'Tipp: Für Änderungen an dieser App setz das Häkchen „Aktuelle App ändern“.'); if (mobile()) tab('p'); break; }
+      const detail = errors.slice(0, 3).join(' | ');
+      add('step err', 'Fehler im Browser: ' + detail);
+      if (attempt === 2) { add('step err', 'Nach zwei Korrekturen gibt es noch Fehler. Beschreib mir, was du ändern willst.'); break; }
+      add('step', 'Der Agent versucht eine Korrektur.');
+      content = 'Runtime error: ' + detail + (/leer/.test(detail) ? '\nThe page shows nothing. Make sure the HTML is complete and closed, the script creates visible elements, and keep the code short.' : '');
+    }
+    if (ok && !demoOnly && $('#backend').value !== 'demo') await saveCurrent(userText);
+  } catch (e) {
+    log.querySelectorAll('.msg .bs').forEach(x => x.closest('.msg').remove());
+    add('step err', 'Abbruch: ' + (e.message || e) + gpuHint(e));
+    setStatus('Fehler.');
+  }
+  busy = false; $('#send').disabled = false;
+}
+
+/* ---------- Bedienung ---------- */
+$('#form').onsubmit = e => {
+  e.preventDefault();
+  const t = $('#input').value.trim();
+  if (!t || busy) return;
+  $('#input').value = '';
+  run(t, false);
+};
+$('#input').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#form').requestSubmit(); } };
+$('#mload').onclick = () => ensureModel().catch(e => { add('step err', 'Modell laden fehlgeschlagen: ' + (e.message || e) + gpuHint(e)); setLeft('chat'); setStatus('Fehler.'); if (mobile()) tab('h'); });
+$('#model').onchange = () => { engine = null; $('#mload').disabled = false; $('#mload').textContent = 'Modell herunterladen'; };
+$('#reset').onclick = () => {
+  if (busy) return;
+  files = {}; history = []; current = ''; currentId = null; log.innerHTML = '';
+  $('#frame').srcdoc = ''; drawFiles(); intro();
+};
+
+function noApp() {
+  add('step err', 'Es gibt noch keine App. Wähle links eine App, beschreib sie der KI, füge Code ein oder baue sie aus Blöcken.');
+  if (mobile()) tab('h');
+}
+$('#dl').onclick = () => {
+  if (!files['index.html']) { noApp(); return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([bundle(true)], { type: 'text/html' }));
+  a.download = (nameOf().replace(/[^\wäöüß -]/gi, '') || 'app') + '.html'; a.click();
+  add('step', 'Download gestartet. Falls nichts passiert (zum Beispiel in der Chat-Vorschau), nimm „Code kopieren“.');
+};
+$('#cp').onclick = () => {
+  if (!files['index.html']) { noApp(); return; }
+  $('#dtext').value = bundle(true); $('#dlg').style.display = 'flex'; $('#dtext').focus(); $('#dtext').select();
+};
+$('#dclose').onclick = () => { $('#dlg').style.display = 'none'; };
+$('#dcopy').onclick = async () => {
+  const t = $('#dtext'); t.focus(); t.select();
+  let ok = false;
+  try { await navigator.clipboard.writeText(t.value); ok = true; }
+  catch (e) { try { ok = document.execCommand('copy'); } catch (e2) {} }
+  $('#dmsg').textContent = ok ? 'Kopiert. Jetzt in eine Datei „app.html“ einfügen.' : 'Der Browser blockiert das Kopieren. Der Text ist markiert: lange drücken bzw. Strg+C.';
+};
+
+/* ---------- Code-Editor (mehrere Dateien) ---------- */
+const nameOf = () => ((files['index.html'] || '').match(/<title>([^<]*)<\/title>/i) || [])[1] || 'Meine App';
+let openFile = '', edTimer = 0;
+function starter() {
+  if (Object.keys(files).length) return;
+  files = {
+    'index.html': '<!DOCTYPE html>\n<html lang="de">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>Meine App</title>\n<link rel="stylesheet" href="style.css">\n</head>\n<body>\n<h1 id="titel">Hallo!</h1>\n<button id="knopf">Klick mich</button>\n<script src="app.js"><\/script>\n</body>\n</html>',
+    'style.css': 'body{font-family:system-ui,sans-serif;text-align:center;margin-top:10vh}\nbutton{font-size:18px;padding:10px 16px}',
+    'app.js': 'document.getElementById("knopf").onclick = () => {\n  document.getElementById("titel").textContent = "Du hast geklickt!";\n};'
+  };
+  projSrc = 'code'; openFile = 'index.html'; current = 'index.html'; drawFiles(); errors = []; render();
+}
+function askName(init, cb) {
+  const i = document.createElement('input'); i.value = init; i.setAttribute('aria-label', 'Dateiname');
+  $('#exl').prepend(i); i.focus(); i.select();
+  let done = false;
+  const fin = ok => { if (done) return; done = true; const v = i.value.trim(); i.remove(); if (ok && v) cb(v); };
+  i.onkeydown = e => { if (e.key === 'Enter') fin(true); else if (e.key === 'Escape') fin(false); };
+  i.onblur = () => fin(true);
+}
+function drawIde() {
+  if (!(openFile in files)) openFile = files['index.html'] != null ? 'index.html' : (Object.keys(files)[0] || '');
+  const l = $('#exl'); l.innerHTML = '';
+  Object.keys(files).sort().forEach(f => {
+    const d = document.createElement('div'); d.textContent = f; d.className = f === openFile ? 'on' : '';
+    d.onclick = () => { openFile = f; drawIde(); };
+    l.appendChild(d);
+  });
+  $('#edn').textContent = openFile || 'Keine Datei offen';
+  $('#ed').value = files[openFile] != null ? files[openFile] : ''; $('#ed').disabled = !openFile;
+}
+$('#nf').onclick = () => askName('', n => { if (files[n] != null) return; files[n] = ''; openFile = n; projSrc = 'code'; drawIde(); drawFiles(); });
+$('#edren').onclick = () => { if (openFile) askName(openFile, n => { if (files[n] != null) return; files[n] = files[openFile]; delete files[openFile]; openFile = n; drawIde(); drawFiles(); errors = []; render(); }); };
+$('#eddel').onclick = function () {
+  if (!openFile) return;
+  if (this.dataset.s) { delete files[openFile]; this.dataset.s = ''; this.textContent = 'Löschen'; drawIde(); drawFiles(); errors = []; render(); }
+  else { this.dataset.s = '1'; this.textContent = 'Wirklich?'; setTimeout(() => { this.dataset.s = ''; this.textContent = 'Löschen'; }, 3000); }
+};
+$('#ed').oninput = () => {
+  if (!openFile) return;
+  files[openFile] = $('#ed').value; projSrc = 'code';
+  clearTimeout(edTimer); edTimer = setTimeout(() => { errors = []; render(); drawFiles(); }, 400);
+};
+$('#ed').onkeydown = e => { if (e.key === 'Tab') { e.preventDefault(); const t = e.target; t.setRangeText('  ', t.selectionStart, t.selectionEnd, 'end'); t.oninput(); } };
+
+/* ---------- Blöcke (Scratch-artig) ---------- */
+function scratchRuntime(P, EDIT) {
+  const W = 480, H = 360, stage = document.getElementById('stage');
+  stage.style.background = P.bg || '#fff';
+  const V = {}, keys = {}, mouse = { x: 0, y: 0 }, shown = {}, mons = {}, S = [], hats = [];
+  (P.vars || []).forEach(n => { V[n] = 0; });
+  let epoch = 0, ac = null;
+  const scale = () => stage.clientWidth / W;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const frame = () => new Promise(r => requestAnimationFrame(r));
+  const kn = k => ({ 'Leertaste': ' ', 'Pfeil rechts': 'arrowright', 'Pfeil links': 'arrowleft', 'Pfeil hoch': 'arrowup', 'Pfeil runter': 'arrowdown' })[k] || String(k).toLowerCase();
+  const NUM = /^\s*-?\d+(\.\d+)?\s*$/, cache = {};
+  const H2 = {
+    zufall: (a, b) => { a = +a; b = +b; return Math.floor(Math.random() * (Math.abs(b - a) + 1)) + Math.min(a, b); },
+    runde: Math.round, abs: Math.abs, wurzel: Math.sqrt,
+    sin: d => Math.sin(d * Math.PI / 180), cos: d => Math.cos(d * Math.PI / 180),
+    taste: k => !!keys[kn(k)], zeit: () => Date.now() / 1000
+  };
+  function touching(s, nm) {
+    if (nm === 'Rand') return Math.abs(s.x) > W / 2 - 20 || Math.abs(s.y) > H / 2 - 20;
+    return S.some(o => o !== s && o.vis && o.n === nm && Math.hypot(o.x - s.x, o.y - s.y) < (o.size + s.size) * 0.24);
+  }
+  function evalX(s, code) {
+    try {
+      const f = cache[code] || (cache[code] = new Function('E', 'with(E){return (' + code + ')}'));
+      return f(Object.assign(Object.create(null), H2, V, { x: s.x, y: s.y, richtung: s.dir, 'größe': s.size, maus_x: mouse.x, maus_y: mouse.y, beruehrt: nm => touching(s, nm) }));
+    } catch (e) { return undefined; }
+  }
+  const ev = (s, e) => { if (NUM.test(e)) return +e; e = String(e == null ? '' : e); const r = evalX(s, e); return r === undefined ? e : r; };
+  const num = (s, e) => +ev(s, e) || 0;
+  const txt = (s, e) => String(e == null ? '' : e).replace(/\{([^}]+)\}/g, (m, x) => { const r = evalX(s, x); return r === undefined ? m : String(r); });
+  const cond = (s, e) => !!evalX(s, String(e));
+  function broadcast(m) { hats.forEach(h => { if (h.o === 'msg' && String(h.a) === String(m)) start(h); }); }
+  async function exec(s, list, al) {
+    for (const b of list) { if (!al()) return false; if ((await step(s, b, al)) === false) return false; }
+    return al();
+  }
+  async function step(s, b, al) {
+    const a = b.a || [], N = i => num(s, a[i]), T = i => txt(s, a[i]), body = l => exec(s, l || [], al);
+    switch (b.o) {
+      case 'move': { const r = s.dir * Math.PI / 180, k = N(0); s.x += k * Math.sin(r); s.y += k * Math.cos(r); break; }
+      case 'turnr': s.dir += N(0); break;
+      case 'turnl': s.dir -= N(0); break;
+      case 'goto': s.x = N(0); s.y = N(1); break;
+      case 'glide': {
+        const t = Math.max(N(0), 0) * 1000, x0 = s.x, y0 = s.y, x1 = N(1), y1 = N(2), t0 = performance.now();
+        for (;;) { if (!al()) return false; const q = t ? Math.min(1, (performance.now() - t0) / t) : 1; s.x = x0 + (x1 - x0) * q; s.y = y0 + (y1 - y0) * q; if (q >= 1) break; await frame(); }
+        break;
+      }
+      case 'dir': s.dir = N(0); break;
+      case 'chx': s.x += N(0); break;
+      case 'setx': s.x = N(0); break;
+      case 'chy': s.y += N(0); break;
+      case 'sety': s.y = N(0); break;
+      case 'bounce': { const mx = W / 2, my = H / 2; if (Math.abs(s.x) > mx) { s.x = Math.sign(s.x) * mx; s.dir = -s.dir; } if (Math.abs(s.y) > my) { s.y = Math.sign(s.y) * my; s.dir = 180 - s.dir; } break; }
+      case 'say': s.say = T(0); break;
+      case 'think': s.say = '💭 ' + T(0); break;
+      case 'sayfor': { s.say = T(0); await sleep(N(1) * 1000); if (!al()) return false; s.say = ''; break; }
+      case 'costume': s.e = T(0); break;
+      case 'size': s.size = N(0); break;
+      case 'chsize': s.size += N(0); break;
+      case 'show': s.vis = true; break;
+      case 'hide': s.vis = false; break;
+      case 'bg': stage.style.background = String(a[0]); break;
+      case 'note': {
+        const f = 440 * Math.pow(2, (N(0) - 69) / 12), d = Math.max(N(1), 0) * 0.5;
+        try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = f; g.gain.value = 0.15; o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + d); } catch (e) {}
+        await sleep(d * 1000); break;
+      }
+      case 'wait': await sleep(N(0) * 1000); break;
+      case 'repeat': { const k = Math.floor(N(0)); for (let i = 0; i < k; i++) { if (!(await body(b.c))) return false; await frame(); } break; }
+      case 'forever': for (;;) { if (!(await body(b.c))) return false; await frame(); }
+      case 'if': if (cond(s, a[0]) && !(await body(b.c))) return false; break;
+      case 'ifelse': if (!(await body(cond(s, a[0]) ? b.c : b.c2))) return false; break;
+      case 'waituntil': while (!cond(s, a[0])) { if (!al()) return false; await frame(); } break;
+      case 'until': while (!cond(s, a[0])) { if (!(await body(b.c))) return false; await frame(); } break;
+      case 'stop': epoch++; return false;
+      case 'setvar': V[a[0]] = ev(s, a[1]); break;
+      case 'chvar': V[a[0]] = (+V[a[0]] || 0) + N(1); break;
+      case 'showvar': shown[a[0]] = true; break;
+      case 'hidevar': delete shown[a[0]]; break;
+      case 'send': broadcast(T(0)); break;
+    }
+    return true;
+  }
+  function start(h) {
+    const g = ++h.gen, ep = epoch, al = () => ep === epoch && g === h.gen;
+    h.run = true;
+    exec(h.s, h.body, al).then(() => { if (g === h.gen) h.run = false; });
+  }
+  function fire(kind, s) { hats.forEach(h => { if (h.o === kind && h.s === s) start(h); }); }
+  P.sprites.forEach(d => {
+    const el = document.createElement('div'); el.className = 'sp'; stage.appendChild(el);
+    const bub = document.createElement('div'); bub.className = 'bub'; bub.style.display = 'none'; stage.appendChild(bub);
+    const s = { id: d.id, n: d.n, e: d.e, x: +d.x || 0, y: +d.y || 0, dir: d.dir == null ? 90 : +d.dir, size: d.size == null ? 100 : +d.size, vis: true, say: '', el, bub };
+    S.push(s);
+    (d.scripts || []).forEach(sc => { const h = sc.b[0]; if (h && ['flag', 'key', 'click', 'msg'].includes(h.o)) hats.push({ s, o: h.o, a: (h.a || [])[0], body: sc.b.slice(1), gen: 0, run: false }); });
+    let moved = false;
+    el.onpointerdown = ev => {
+      moved = false;
+      if (!EDIT) return;
+      ev.preventDefault();
+      const r = stage.getBoundingClientRect(), k = scale();
+      const mv = m => { moved = true; s.x = Math.round((m.clientX - r.left) / k - W / 2); s.y = Math.round(H / 2 - (m.clientY - r.top) / k); };
+      const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); if (moved) parent.postMessage({ pos: [s.id, s.x, s.y] }, '*'); };
+      addEventListener('pointermove', mv); addEventListener('pointerup', up);
+    };
+    el.onclick = () => { if (!moved) fire('click', s); };
+  });
+  stage.addEventListener('pointermove', e => { const r = stage.getBoundingClientRect(), k = scale(); mouse.x = (e.clientX - r.left) / k - W / 2; mouse.y = H / 2 - (e.clientY - r.top) / k; });
+  addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (k === ' ' || k.indexOf('arrow') === 0) e.preventDefault(); keys[k] = true; });
+  addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+  document.getElementById('flag').onclick = () => { epoch++; hats.forEach(h => { if (h.o === 'flag') start(h); }); };
+  document.getElementById('stopb').onclick = () => { epoch++; S.forEach(s => { s.say = ''; }); };
+  (function loop() {
+    hats.forEach(h => { if (h.o === 'key' && keys[kn(h.a)] && !h.run) start(h); });
+    const k = scale();
+    S.forEach(s => {
+      s.el.style.display = s.vis ? '' : 'none';
+      if (s.el.textContent !== s.e) s.el.textContent = s.e;
+      s.el.style.fontSize = (48 * s.size / 100 * k) + 'px';
+      s.el.style.left = (W / 2 + s.x) * k + 'px'; s.el.style.top = (H / 2 - s.y) * k + 'px';
+      s.el.style.transform = 'translate(-50%,-50%) rotate(' + (s.dir - 90) + 'deg)';
+      s.bub.style.display = s.vis && s.say ? '' : 'none';
+      if (s.say) { s.bub.textContent = s.say; s.bub.style.left = (W / 2 + s.x) * k + 'px'; s.bub.style.top = ((H / 2 - s.y) - 28 * s.size / 100) * k + 'px'; s.bub.style.fontSize = 14 * k + 'px'; }
+    });
+    Object.keys(V).forEach((n, i) => {
+      let m = mons[n];
+      if (!shown[n]) { if (m) { m.remove(); delete mons[n]; } return; }
+      if (!m) { m = mons[n] = document.createElement('div'); m.className = 'mon'; stage.appendChild(m); }
+      m.style.top = (6 + i * 26) + 'px'; m.textContent = n + ': ' + V[n];
+    });
+    requestAnimationFrame(loop);
+  })();
+}
+
+const PAGECSS = 'html,body{margin:0;height:100%;background:#222;color:#fff;font-family:system-ui,sans-serif;overflow:hidden}body{display:flex;flex-direction:column;align-items:center}#bar{padding:6px}#bar button{font-size:20px;padding:4px 12px;margin:0 4px;border-radius:8px;border:0;cursor:pointer}#stage{position:relative;width:min(100vw,calc((100vh - 52px) * 4 / 3));aspect-ratio:4/3;overflow:hidden;touch-action:none}.sp{position:absolute;user-select:none;line-height:1;white-space:nowrap}.bub{position:absolute;transform:translate(-50%,-100%);background:#fff;color:#111;border:2px solid #999;border-radius:12px;padding:3px 9px;white-space:nowrap}.mon{position:absolute;left:6px;background:#ff8c1a;color:#fff;border-radius:6px;padding:2px 8px;font-size:13px}';
+function scratchPage(P, edit) {
+  const j = JSON.stringify(P).replace(/</g, '\\u003c'), esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  return '<!DOCTYPE html>\n<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(P.name || 'Meine Block-App') + '</title><style>' + PAGECSS + '</style></head><body><div id="bar"><button id="flag" title="Start">🏁</button><button id="stopb" title="Stopp">⏹</button></div><div id="stage"></div><script>(' + scratchRuntime.toString() + ')(' + j + ',' + !!edit + ');<\/script></body></html>';
+}
+
+const CAT = { mo: ['Bewegung', '#4c97ff'], lo: ['Aussehen', '#9966ff'], so: ['Klang', '#cf63cf'], ev: ['Ereignisse', '#e6a800'], co: ['Steuerung', '#ffab19'], va: ['Variablen', '#ff8c1a'] };
+const KEYS = ['Leertaste', 'Pfeil rechts', 'Pfeil links', 'Pfeil hoch', 'Pfeil runter', ...'abcdefghijklmnopqrstuvwxyz0123456789'];
+const BD = {
+  flag: { c: 'ev', l: 'Wenn 🏁 angeklickt wird', s: 'hat' },
+  key: { c: 'ev', l: 'Wenn Taste %k gedrückt wird', d: ['Leertaste'], s: 'hat' },
+  click: { c: 'ev', l: 'Wenn diese Figur angeklickt wird', s: 'hat' },
+  msg: { c: 'ev', l: 'Wenn ich Nachricht %m empfange', d: ['hallo'], s: 'hat' },
+  send: { c: 'ev', l: 'Sende Nachricht %m', d: ['hallo'] },
+  move: { c: 'mo', l: 'gehe %n er-Schritt', d: [10] },
+  turnr: { c: 'mo', l: 'drehe dich nach rechts um %n Grad', d: [15] },
+  turnl: { c: 'mo', l: 'drehe dich nach links um %n Grad', d: [15] },
+  goto: { c: 'mo', l: 'gehe zu x: %n y: %n', d: [0, 0] },
+  glide: { c: 'mo', l: 'gleite in %n Sek. zu x: %n y: %n', d: [1, 0, 0] },
+  dir: { c: 'mo', l: 'setze Richtung auf %n Grad', d: [90] },
+  chx: { c: 'mo', l: 'ändere x um %n', d: [10] },
+  setx: { c: 'mo', l: 'setze x auf %n', d: [0] },
+  chy: { c: 'mo', l: 'ändere y um %n', d: [10] },
+  sety: { c: 'mo', l: 'setze y auf %n', d: [0] },
+  bounce: { c: 'mo', l: 'pralle vom Rand ab' },
+  say: { c: 'lo', l: 'sage %t', d: ['Hallo!'] },
+  sayfor: { c: 'lo', l: 'sage %t für %n Sekunden', d: ['Hallo!', 2] },
+  think: { c: 'lo', l: 'denke %t', d: ['Hmm …'] },
+  costume: { c: 'lo', l: 'wechsle zu Aussehen %e', d: ['😺'] },
+  size: { c: 'lo', l: 'setze Größe auf %n Prozent', d: [100] },
+  chsize: { c: 'lo', l: 'ändere Größe um %n', d: [10] },
+  show: { c: 'lo', l: 'zeige dich' },
+  hide: { c: 'lo', l: 'verstecke dich' },
+  bg: { c: 'lo', l: 'setze Hintergrund auf %x', d: ['#cfe8ff'] },
+  note: { c: 'so', l: 'spiele Ton %n für %n Schläge', d: [60, 0.5] },
+  wait: { c: 'co', l: 'warte %n Sekunden', d: [1] },
+  repeat: { c: 'co', l: 'wiederhole %n mal', d: [10], s: 'c' },
+  forever: { c: 'co', l: 'wiederhole fortlaufend', s: 'cc' },
+  if: { c: 'co', l: 'falls %c dann', d: ['x > 0'], s: 'c' },
+  ifelse: { c: 'co', l: 'falls %c dann', d: ['x > 0'], s: 'ce' },
+  waituntil: { c: 'co', l: 'warte bis %c', d: ['taste("Leertaste")'] },
+  until: { c: 'co', l: 'wiederhole bis %c', d: ['x > 200'], s: 'c' },
+  stop: { c: 'co', l: 'stoppe alles', s: 'cap' },
+  setvar: { c: 'va', l: 'setze %v auf %n', d: ['', 0] },
+  chvar: { c: 'va', l: 'ändere %v um %n', d: ['', 1] },
+  showvar: { c: 'va', l: 'zeige Variable %v', d: [''] },
+  hidevar: { c: 'va', l: 'verstecke Variable %v', d: [''] }
+};
+const SLOT = /(%[ntcvkemx])/;
+const foreign = () => projSrc !== 'blocks' && Object.keys(files).length > 0;
+const spr = () => proj.sprites[selSp] || proj.sprites[0];
+let wsTimer = 0;
+function changed() { clearTimeout(wsTimer); wsTimer = setTimeout(genBlocks, 250); }
+function cleanup() { const q = spr(); q.scripts = q.scripts.filter(z => z.b.length); }
+function fresh(op) {
+  const D = BD[op], b = { o: op, a: [] };
+  (D.l.match(/%[ntcvkemx]/g) || []).forEach((k, i) => { b.a.push(k === '%v' ? (proj.vars[0] || '') : D.d[i]); });
+  if (/^(c|cc|ce)$/.test(D.s || '')) b.c = [];
+  if (D.s === 'ce') b.c2 = [];
+  return b;
+}
+function slot(b, i, k) {
+  let el;
+  if (k === 'v' || k === 'k') {
+    el = document.createElement('select');
+    (k === 'v' ? proj.vars : KEYS).forEach(o => el.add(new Option(o)));
+    if (k === 'v' && b.a[i] && !proj.vars.includes(b.a[i])) el.add(new Option(b.a[i]));
+  } else { el = document.createElement('input'); el.type = k === 'x' ? 'color' : 'text'; }
+  el.value = b.a[i] == null ? '' : b.a[i];
+  const fit = () => { if (el.tagName === 'INPUT' && k !== 'x') el.style.width = Math.max(3, String(el.value).length + 1) + 'ch'; };
+  fit();
+  el.oninput = el.onchange = () => { b.a[i] = el.value; fit(); changed(); };
+  return el;
+}
+function blockEl(b, ref) {
+  const D = BD[b.o], el = document.createElement('div'), row = document.createElement('div');
+  el.className = 'blk ' + (D.s || 'stack'); el.style.setProperty('--c', CAT[D.c][1]); el._b = b; el._ref = ref;
+  row.className = 'brow'; row.onpointerdown = ev => startDrag(ev, el);
+  let ai = 0;
+  D.l.split(SLOT).forEach(p => {
+    if (!p) return;
+    if (/^%[ntcvkemx]$/.test(p)) row.appendChild(slot(b, ai++, p[1]));
+    else { const t = document.createElement('span'); t.textContent = p; row.appendChild(t); }
+  });
+  el.appendChild(row);
+  const inner = arr => { const c = document.createElement('div'); c.className = 'cin'; c._arr = arr; arr.forEach((x, i) => c.appendChild(blockEl(x, { list: arr, i }))); return c; };
+  if (/^(c|cc|ce)$/.test(D.s || '')) {
+    b.c = b.c || []; el.appendChild(inner(b.c));
+    if (D.s === 'ce') { const m = document.createElement('div'); m.className = 'brow'; m.textContent = 'sonst'; m.style.cursor = 'default'; el.appendChild(m); b.c2 = b.c2 || []; el.appendChild(inner(b.c2)); }
+    const f = document.createElement('div'); f.className = 'cfoot'; el.appendChild(f);
+  }
+  return el;
+}
+function drawWs() {
+  const ws = $('#ws'); ws.innerHTML = '';
+  spr().scripts.forEach(sc => {
+    const d = document.createElement('div'); d.className = 'script'; d.style.left = sc.x + 'px'; d.style.top = sc.y + 'px';
+    sc.b.forEach((b, i) => d.appendChild(blockEl(b, { list: sc.b, i })));
+    ws.appendChild(d);
+  });
+}
+function drawPal() {
+  const c = $('#cats'); c.innerHTML = '';
+  Object.entries(CAT).forEach(([k, v]) => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = v[0]; b.style.borderBottom = '4px solid ' + v[1];
+    if (k === catSel) b.classList.add('on');
+    b.onclick = () => { catSel = k; drawPal(); };
+    c.appendChild(b);
+  });
+  const p = $('#pallist'); p.innerHTML = '';
+  if (catSel === 'va') {
+    const r = document.createElement('div'); r.className = 'vrow';
+    const i = document.createElement('input'); i.placeholder = 'Variablenname'; i.setAttribute('aria-label', 'Variablenname');
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = 'Variable erstellen';
+    b.onclick = () => {
+      const n = i.value.trim();
+      if (!/^[A-Za-zÄÖÜäöüß_][A-Za-z0-9ÄÖÜäöüß_]*$/.test(n)) { setStatus('Variablennamen: Buchstaben, Zahlen und _, ohne Leerzeichen.'); return; }
+      if (!proj.vars.includes(n)) proj.vars.push(n);
+      drawPal(); drawBlocks(); changed();
+    };
+    r.append(i, b); p.appendChild(r);
+    const l = document.createElement('div'); l.style.cssText = 'font-size:12px;margin-bottom:8px'; l.textContent = 'Variablen: ' + (proj.vars.join(', ') || 'noch keine'); p.appendChild(l);
+  }
+  Object.keys(BD).filter(o => BD[o].c === catSel).forEach(o => p.appendChild(blockEl(fresh(o), { pal: o })));
+}
+function drawBlocks() {
+  $('#bnote').hidden = !foreign();
+  const bar = $('#spbar'); bar.innerHTML = '';
+  proj.sprites.forEach((q, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = q.e + ' ' + q.n; if (i === selSp) b.classList.add('on');
+    b.onclick = () => { selSp = i; drawBlocks(); };
+    bar.appendChild(b);
+  });
+  const add = document.createElement('button'); add.type = 'button'; add.textContent = '+ Figur';
+  add.onclick = () => {
+    const em = ['🐶', '🐸', '🚀', '⭐', '🍎', '🐟'][proj.sprites.length % 6];
+    proj.sprites.push({ id: 's' + Date.now(), n: 'Figur' + (proj.sprites.length + 1), e: em, x: 0, y: 0, dir: 90, size: 100, scripts: [] });
+    selSp = proj.sprites.length - 1; drawBlocks(); changed();
+  };
+  bar.appendChild(add);
+  const q = spr(), pr = $('#spprops'); pr.innerHTML = '';
+  const f = (t, v, type, fn, w) => { const l = document.createElement('label'), e = document.createElement('input'); e.type = type; e.value = v; if (w) e.style.width = w; e.oninput = () => fn(e.value); l.append(t + ' ', e); pr.appendChild(l); };
+  f('Projekt', proj.name, 'text', v => { proj.name = v; changed(); }, '12ch');
+  f('Name', q.n, 'text', v => { q.n = v; changed(); }, '9ch');
+  f('Aussehen', q.e, 'text', v => { q.e = v; changed(); }, '6ch');
+  f('x', q.x, 'number', v => { q.x = +v || 0; changed(); }, '7ch');
+  f('y', q.y, 'number', v => { q.y = +v || 0; changed(); }, '7ch');
+  f('Hintergrund', proj.bg, 'color', v => { proj.bg = v; changed(); });
+  if (proj.sprites.length > 1) { const d = document.createElement('button'); d.type = 'button'; d.textContent = 'Figur löschen'; d.onclick = () => { proj.sprites.splice(selSp, 1); selSp = 0; drawBlocks(); changed(); }; pr.appendChild(d); }
+  drawWs();
+}
+function snap(tail, gx, gy, gh) {
+  if (BD[tail[0].o].s === 'hat') return null;
+  const closed = o => /^(cap|cc)$/.test(BD[o].s || ''), endsOpen = !closed(tail[tail.length - 1].o), ws = $('#ws');
+  let best = null, bd = 36;
+  const test = (d, list, i) => { if (d < bd) { bd = d; best = { list, i }; } };
+  ws.querySelectorAll('.blk').forEach(e => {
+    const r = e.getBoundingClientRect();
+    if (!closed(e._b.o)) test(Math.hypot(gx - r.left, gy - r.bottom), e._ref.list, e._ref.i + 1);
+    if (endsOpen && !e.previousElementSibling && BD[e._b.o].s !== 'hat' && e.parentElement.classList.contains('script')) test(Math.hypot(gx - r.left, gy + gh - r.top), e._ref.list, 0);
+  });
+  ws.querySelectorAll('.cin').forEach(c => { const r = c.getBoundingClientRect(); test(Math.hypot(gx - r.left, gy - r.top), c._arr, 0); });
+  return best;
+}
+function startDrag(ev, el) {
+  if (/^(INPUT|SELECT)$/.test(ev.target.tagName)) return;
+  ev.preventDefault();
+  const ref = el._ref, r0 = el.getBoundingClientRect(), ox = ev.clientX - r0.left, oy = ev.clientY - r0.top;
+  let tail;
+  if (ref.pal) tail = [fresh(ref.pal)];
+  else { tail = []; for (let n = el; n; n = n.nextElementSibling) if (n.classList.contains('blk')) { tail.push(n._b); n.classList.add('dim'); } }
+  const ghost = document.createElement('div'); ghost.className = 'ghost';
+  tail.forEach((b, i) => ghost.appendChild(blockEl(b, { list: tail, i })));
+  document.body.appendChild(ghost);
+  const pos = e => { ghost.style.left = e.clientX - ox + 'px'; ghost.style.top = e.clientY - oy + 'px'; };
+  pos(ev);
+  const up = e => {
+    removeEventListener('pointermove', pos); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
+    const gx = e.clientX - ox, gy = e.clientY - oy, gh = ghost.offsetHeight; ghost.remove();
+    const inRect = (r, x, y) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+    if (!ref.pal) { ref.list.splice(ref.i, tail.length); cleanup(); drawWs(); }
+    if (!inRect($('#pallist').getBoundingClientRect(), e.clientX, e.clientY)) {
+      const sn = snap(tail, gx, gy, gh), wr = $('#ws').getBoundingClientRect();
+      if (sn) sn.list.splice(sn.i, 0, ...tail);
+      else spr().scripts.push({ x: Math.max(0, Math.round(gx - wr.left + $('#ws').scrollLeft)), y: Math.max(0, Math.round(gy - wr.top + $('#ws').scrollTop)), b: tail });
+    }
+    cleanup(); drawBlocks(); changed();
+  };
+  addEventListener('pointermove', pos); addEventListener('pointerup', up); addEventListener('pointercancel', up);
+}
+function genBlocks() {
+  if (foreign()) return;
+  files = { 'index.html': scratchPage(proj, true) };
+  current = 'index.html'; projSrc = 'blocks'; drawFiles(); errors = []; render();
+}
+$('#bstart').onclick = () => { files = {}; current = ''; projSrc = 'blocks'; drawBlocks(); genBlocks(); };
+
+/* ---------- Speichern ---------- */
+function saveProject(src) {
+  let a = apps.find(x => x.id === currentId);
+  if (!a) { a = { id: 'a' + Date.now(), name: nameOf(), prompt: src === 'blocks' ? 'Aus Blöcken gebaut' : 'Eigener Code', created: Date.now(), share: false, files: {} }; apps.unshift(a); currentId = a.id; }
+  a.files = { ...files }; a.updated = Date.now(); a.src = src;
+  if (src === 'blocks') a.blocks = JSON.parse(JSON.stringify(projKind === 'site' ? { els, bgc } : { proj }));
+  const ok = saveApps(); drawLib();
+  setStatus(ok ? 'Gespeichert als „' + a.name + '“.' : 'Speichern im Browser ist hier blockiert. Öffne die Datei direkt im Browser.');
+  return a;
+}
+$('#sv').onclick = () => { if (!files['index.html']) { noApp(); return; } saveProject(projSrc); };
+
+/* ---------- Veröffentlichen: Link und QR-Code ---------- */
+async function qr(link) {
+  const box = $('#pqrbox');
+  try {
+    if (!window.qrcode) await new Promise((ok, no) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
+      s.onload = ok; s.onerror = () => no(new Error('Die QR-Bibliothek ließ sich nicht laden (Internet nötig).'));
+      document.head.appendChild(s);
+    });
+    const q = qrcode(0, 'L'); q.addData(link); q.make();
+    box.innerHTML = '<div style="background:#fff;padding:8px;display:inline-block;border-radius:6px">' + q.createSvgTag(4, 0) + '</div>';
+  } catch (e) { box.textContent = /overflow/i.test(e.message) ? 'Die App ist für einen QR-Code zu groß. Der Link funktioniert trotzdem.' : e.message; }
+}
+const GH = 'https://api.github.com';
+const gh = (tok, path, opt = {}) => fetch(GH + path, { ...opt, headers: { Accept: 'application/vnd.github+json', Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' } });
+const b64s = t => { let o = ''; for (const x of new TextEncoder().encode(t)) o += String.fromCharCode(x); return btoa(o); };
+const pageBase = (login, repo) => 'https://' + login + '.github.io/' + (repo.toLowerCase() === (login + '.github.io').toLowerCase() ? '' : repo + '/');
+const slugify = t => { const v = String(t).toLowerCase().replace(/[äÄ]/g, 'ae').replace(/[öÖ]/g, 'oe').replace(/[üÜ]/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40); return v.length >= 3 ? v : 'meine-app'; };
+const ghSaved = () => { try { return JSON.parse(localStorage.getItem('miniagent.gh') || '{}'); } catch (e) { return {}; } };
+function prevLink() {
+  const g = ghSaved(), repo = $('#grepo').value.trim() || 'meine-apps', slug = $('#pslug').value.trim().toLowerCase() || 'name';
+  $('#pprev').textContent = 'Link: ' + pageBase(g.login || 'deinname', repo) + slug + '/';
+}
+$('#pslug').oninput = $('#grepo').oninput = prevLink;
+async function ghPublish(tok, repo, slug, out, say) {
+  say('Prüfe Token …');
+  let r = await gh(tok, '/user');
+  if (r.status === 401) throw new Error('GitHub lehnt den Token ab. Prüfe, ob er vollständig kopiert ist und „repo“ angehakt war.');
+  if (!r.ok) throw new Error('GitHub antwortet mit Status ' + r.status + '.');
+  const login = (await r.json()).login;
+  say('Prüfe Repository …');
+  r = await gh(tok, '/repos/' + login + '/' + repo);
+  let branch = 'main';
+  if (r.status === 404) {
+    say('Lege Repository „' + repo + '“ an …');
+    r = await gh(tok, '/user/repos', { method: 'POST', body: JSON.stringify({ name: repo, auto_init: true, private: false, description: 'Apps aus Bitbench' }) });
+    if (!r.ok) throw new Error('Das Repository ließ sich nicht anlegen (Status ' + r.status + ').');
+    branch = (await r.json()).default_branch || 'main';
+    await sleep(1500);
+  } else if (r.ok) branch = (await r.json()).default_branch || 'main';
+  else throw new Error('Repository-Abfrage fehlgeschlagen (Status ' + r.status + ').');
+  say('Schalte GitHub Pages ein …');
+  r = await gh(tok, '/repos/' + login + '/' + repo + '/pages', { method: 'POST', body: JSON.stringify({ source: { branch, path: '/' } }) });
+  const pagesOk = r.ok || r.status === 409;
+  for (const [name, text] of Object.entries(out)) {
+    say('Lade ' + name + ' hoch …');
+    const path = '/repos/' + login + '/' + repo + '/contents/' + (slug ? slug + '/' : '') + name.split('/').map(encodeURIComponent).join('/');
+    let sha;
+    const g = await gh(tok, path + '?ref=' + encodeURIComponent(branch));
+    if (g.ok) sha = (await g.json()).sha;
+    r = await gh(tok, path, { method: 'PUT', body: JSON.stringify({ message: (slug ? 'App ' + slug : 'Plattform') + ': ' + name, content: b64s(text), branch, ...(sha ? { sha } : {}) }) });
+    if (!r.ok) throw new Error('Hochladen von ' + name + ' fehlgeschlagen (Status ' + r.status + ').');
+  }
+  return { login, url: pageBase(login, repo) + (slug ? slug + '/' : ''), pagesOk };
+}
+$('#pubb').onclick = () => {
+  if (!files['index.html']) { noApp(); return; }
+  const g = ghSaved();
+  $('#pname').value = nameOf(); $('#pslug').value = slugify(nameOf()); $('#gtoken').value = g.tok || ''; $('#grepo').value = g.repo || 'meine-apps';
+  $('#gset').open = !g.tok; $('#plink').value = ''; $('#pqrbox').innerHTML = ''; prevLink();
+  $('#pub').style.display = 'flex';
+};
+$('#pclose').onclick = () => { $('#pub').style.display = 'none'; };
+$('#pmake').onclick = async () => {
+  const msg = $('#pmsg'), say = t => { msg.textContent = t; };
+  const tok = $('#gtoken').value.trim(), repo = $('#grepo').value.trim() || 'meine-apps', slug = $('#pslug').value.trim().toLowerCase();
+  if (!tok) { $('#gset').open = true; say('Verbinde zuerst GitHub: Token eintragen (siehe „GitHub-Verbindung“).'); return; }
+  if (!/^[a-z0-9-]{3,40}$/.test(slug)) { say('Der Name im Link darf nur a–z, 0–9 und „-“ enthalten (3 bis 40 Zeichen).'); return; }
+  if (!/^[\w.-]{1,100}$/.test(repo)) { say('Der Repository-Name darf nur Buchstaben, Zahlen, „-“, „_“ und „.“ enthalten.'); return; }
+  const out = projSrc === 'blocks' ? { 'index.html': bundle(true) } : { ...files };
+  if (out['index.html'] == null) { say('Es fehlt eine Datei „index.html“.'); return; }
+  $('#pmake').disabled = true;
+  try {
+    const res = await ghPublish(tok, repo, slug, out, say);
+    try { localStorage.setItem('miniagent.gh', JSON.stringify({ tok, repo, login: res.login })); } catch (e) {}
+    $('#plink').value = res.url; $('#pqrbox').innerHTML = ''; saveProject(projSrc);
+    say('Hochgeladen und gespeichert. GitHub braucht meist ein bis zwei Minuten, bis der Link erreichbar ist.' + (res.pagesOk ? '' : ' GitHub Pages ließ sich nicht automatisch einschalten: Schalte es im Repository unter Settings, Pages, Branch main ein.'));
+    if ($('#pqr').checked) await qr(res.url);
+  } catch (e) { say('Fehlgeschlagen: ' + (e.message || e)); }
+  $('#pmake').disabled = false;
+};
+$('#pcopy').onclick = async () => {
+  const t = $('#plink'); if (!t.value) return;
+  t.select();
+  try { await navigator.clipboard.writeText(t.value); $('#pmsg').textContent = 'Link kopiert.'; }
+  catch (e) { try { document.execCommand('copy'); $('#pmsg').textContent = 'Link kopiert.'; } catch (e2) { $('#pmsg').textContent = 'Kopieren blockiert. Der Link ist markiert: lange drücken bzw. Strg+C.'; } }
+};
+
+/* ---------- Webseiten-Editor (Elemente frei platzieren) ---------- */
+const ET = { h1: ['Überschrift', '#4c97ff', 'Meine Seite'], p: ['Text', '#4c97ff', 'Hallo!'], btn: ['Knopf', '#ff6680', 'Klick mich'], inp: ['Eingabefeld', '#59c059', 'Tippe hier'], img: ['Bild (Emoji)', '#59c059', '😀'], box: ['Farbfläche', '#59c059', '#ffd166'], cnt: ['Zähler', '#9966ff', '0'], out: ['Ausgabefeld', '#9966ff', 'Ausgabe'], clk: ['Uhr', '#9966ff', '00:00:00'] };
+const ACTS = ['Text ausgeben', 'Text anhängen', 'Ausgabe leeren', 'Zähler +1', 'Zähler +10', 'Zähler −1', 'Zähler auf 0', 'Eingabe ausgeben', 'Eingabe zum Zähler addieren', 'Würfeln (1–6)', 'Zufallszahl (1–100)', 'Uhrzeit ausgeben', 'Farbe wechseln', 'Seitenfarbe setzen', 'Knopf verstecken', 'Knopf größer'];
+let els = [{ t: 'h1', v: 'Meine Seite', x: 50, y: 12, a: ACTS[0], z: 'Hallo!' }, { t: 'btn', v: 'Klick mich', x: 50, y: 40, a: 'Zähler +1', z: 'Hallo!' }, { t: 'cnt', v: '0', x: 50, y: 62, a: ACTS[0], z: 'Hallo!' }], bgc = '#ffffff', sel = -1;
+const DEF_PROJ = JSON.stringify(proj), DEF_ELS = JSON.stringify(els);
+function sitePal() {
+  const p = $('#spal'); p.innerHTML = '';
+  Object.entries(ET).forEach(([t, d]) => {
+    const b = document.createElement('button'); b.type = 'button'; b.style.setProperty('--c', d[1]); b.textContent = '+ ' + d[0];
+    b.onclick = () => {
+      if (foreign()) { setStatus('Starte zuerst das Block-Projekt (Hinweis oben).'); return; }
+      els.push({ t, v: d[2], x: 50, y: 12 + (els.length * 13) % 76, a: ACTS[0], z: 'Hallo!' }); sel = els.length - 1;
+      siteDraw(); siteGen();
+    };
+    p.appendChild(b);
+  });
+}
+function siteDraw() {
+  $('#bnote2').hidden = !foreign();
+  const st = $('#sstage'); st.innerHTML = ''; st.style.background = bgc;
+  const fw = $('#frame').clientWidth, fh = $('#frame').clientHeight;
+  st.style.aspectRatio = fw && fh ? fw + ' / ' + fh : '9 / 14';
+  els.forEach((e, i) => {
+    const d = document.createElement('div'); d.className = 'cel ' + e.t + (i === sel ? ' sel' : '');
+    d.textContent = e.t === 'box' ? '' : e.v; if (e.t === 'box') d.style.background = e.v;
+    d.style.left = e.x + '%'; d.style.top = e.y + '%';
+    d.onpointerdown = ev => {
+      ev.preventDefault(); sel = i;
+      try { d.setPointerCapture(ev.pointerId); } catch (x) {}
+      const r = st.getBoundingClientRect(), pc = (v, a, n) => Math.round(Math.min(100, Math.max(0, (v - a) / n * 100)));
+      d.onpointermove = m => { e.x = pc(m.clientX, r.left, r.width); e.y = pc(m.clientY, r.top, r.height); d.style.left = e.x + '%'; d.style.top = e.y + '%'; };
+      d.onpointerup = () => { d.onpointermove = d.onpointerup = null; siteDraw(); siteGen(); };
+    };
+    st.appendChild(d);
+  });
+  const p = $('#sprops'); p.innerHTML = '';
+  const field = (t, val, type, fn) => {
+    const l = document.createElement('label'), x = document.createElement(type === 'select' ? 'select' : 'input');
+    if (type === 'select') ACTS.forEach(o => x.add(new Option(o))); else x.type = type;
+    x.value = val; x.oninput = x.onchange = () => fn(x.value);
+    l.append(t + ' ', x); p.appendChild(l);
+  };
+  field('Seitenfarbe', bgc, 'color', v => { bgc = v; $('#sstage').style.background = v; siteGen(); });
+  const e = els[sel];
+  if (!e) { const h = document.createElement('span'); h.textContent = 'Tippe ein Element an, um es zu bearbeiten. Ziehen verschiebt es.'; p.appendChild(h); return; }
+  field(ET[e.t][0], e.v, e.t === 'box' ? 'color' : 'text', v => { e.v = v; const c = $('#sstage .sel'); if (c) { if (e.t === 'box') c.style.background = v; else c.textContent = v; } siteGen(); });
+  if (e.t === 'btn') { field('Aktion', e.a, 'select', v => { e.a = v; siteGen(); }); field('Text dazu', e.z, 'text', v => { e.z = v; siteGen(); }); }
+  const del = document.createElement('button'); del.type = 'button'; del.textContent = 'Element löschen';
+  del.onclick = () => { els.splice(sel, 1); sel = -1; siteDraw(); siteGen(); };
+  p.appendChild(del);
+}
+function siteGen() {
+  if (foreign()) return;
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const J = t => JSON.stringify(String(t == null ? '' : t)).replace(/</g, '\\u003c');
+  const A = {
+    'Text ausgeben': e => '$("out").textContent=' + J(e.z),
+    'Text anhängen': e => '$("out").textContent+=' + J(e.z) + '+" "',
+    'Ausgabe leeren': () => '$("out").textContent=""',
+    'Zähler +1': () => 'z++;$("cnt").textContent=z',
+    'Zähler +10': () => 'z+=10;$("cnt").textContent=z',
+    'Zähler −1': () => 'z--;$("cnt").textContent=z',
+    'Zähler auf 0': () => 'z=0;$("cnt").textContent=z',
+    'Eingabe ausgeben': () => '$("out").textContent=$("inp").value',
+    'Eingabe zum Zähler addieren': () => 'z+=Number($("inp").value)||0;$("cnt").textContent=z',
+    'Würfeln (1–6)': () => '$("out").textContent=1+Math.floor(Math.random()*6)',
+    'Zufallszahl (1–100)': () => '$("out").textContent=1+Math.floor(Math.random()*100)',
+    'Uhrzeit ausgeben': () => '$("out").textContent=new Date().toLocaleTimeString()',
+    'Farbe wechseln': () => 'document.body.style.background="hsl("+Math.floor(Math.random()*360)+",70%,85%)"',
+    'Seitenfarbe setzen': e => 'document.body.style.background=' + J(e.z),
+    'Knopf verstecken': () => 'this.style.display="none"',
+    'Knopf größer': () => 'this.style.fontSize=(parseFloat(getComputedStyle(this).fontSize)*1.2)+"px"'
+  };
+  let body = '', title = '', n = 0, js = 'let z=0;const $=i=>document.getElementById(i)||{};';
+  els.forEach(e => {
+    const st = 'position:absolute;left:' + e.x + '%;top:' + e.y + '%;transform:translate(-50%,-50%);margin:0;white-space:nowrap;';
+    if (e.t === 'h1') { body += '<h1 style="' + st + '">' + esc(e.v) + '</h1>'; title = title || e.v; }
+    else if (e.t === 'p') body += '<p style="' + st + '">' + esc(e.v) + '</p>';
+    else if (e.t === 'img') body += '<div style="' + st + 'font-size:48px">' + esc(e.v) + '</div>';
+    else if (e.t === 'box') body += '<div style="' + st + 'width:120px;height:70px;border-radius:8px;background:' + esc(e.v) + '"></div>';
+    else if (e.t === 'inp') body += '<input id="inp" style="' + st + '" placeholder="' + esc(e.v) + '">';
+    else if (e.t === 'cnt') body += '<div id="cnt" style="' + st + 'font-size:48px">0</div>';
+    else if (e.t === 'out') body += '<p id="out" style="' + st + '"></p>';
+    else if (e.t === 'clk') { body += '<div id="clk" style="' + st + 'font-size:32px">00:00:00</div>'; js += 'setInterval(()=>{$("clk").textContent=new Date().toLocaleTimeString()},1000);'; }
+    else if (e.t === 'btn') { const id = 'b' + n++; body += '<button id="' + id + '" style="' + st + '">' + esc(e.v) + '</button>'; js += '$("' + id + '").onclick=function(){' + (A[e.a] || A['Text ausgeben'])(e) + '};'; }
+  });
+  files = { 'index.html': '<!DOCTYPE html>\n<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(title || 'Meine Seite') + '</title><style>html,body{height:100%;margin:0}body{font-family:system-ui,sans-serif;background:' + esc(bgc) + '}button{font-size:18px;padding:10px 16px;border-radius:10px;border:1px solid #bbb;cursor:pointer}</style></head><body><div style="position:relative;width:100%;height:100vh;overflow:hidden">' + body + '</div><script>' + js + '<\/script></body></html>' };
+  current = 'index.html'; projSrc = 'blocks'; drawFiles(); errors = []; render();
+}
+$('#bstart2').onclick = () => { files = {}; current = ''; projSrc = 'blocks'; siteDraw(); siteGen(); };
+function blocksOpen() {
+  if (projKind === 'site') { sitePal(); siteDraw(); siteGen(); } else { drawPal(); drawBlocks(); genBlocks(); }
+}
+
+/* ---------- Plattform: Konto, Startseite, Hochladen ---------- */
+const sb = { ok: () => !!(CFG.url && CFG.key) };
+const setSess = j => {
+  sess = j ? { token: j.access_token, refresh: j.refresh_token, exp: Date.now() + (j.expires_in || 3600) * 1000, user: { id: j.user.id, email: j.user.email, name: (j.user.user_metadata && j.user.user_metadata.name) || j.user.email.split('@')[0] } } : null;
+  try { if (sess) localStorage.setItem('miniagent.sess', JSON.stringify(sess)); else localStorage.removeItem('miniagent.sess'); } catch (e) {}
+};
+async function refreshSess() {
+  if (!sess || !sess.refresh || Date.now() < sess.exp - 60000) return;
+  try {
+    const r = await fetch(CFG.url + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: CFG.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: sess.refresh }) });
+    setSess(r.ok ? await r.json() : null);
+  } catch (e) {}
+}
+async function sbf(path, opt = {}, auth = true) {
+  if (auth) await refreshSess();
+  const h = { apikey: CFG.key, 'Content-Type': 'application/json', ...(opt.headers || {}) };
+  const tok = auth && sess ? sess.token : (CFG.key.startsWith('eyJ') ? CFG.key : '');
+  if (tok) h.Authorization = 'Bearer ' + tok;
+  return fetch(CFG.url + path, { ...opt, headers: h });
+}
+async function loadCfg() {
+  try { if (/^https?:/.test(location.protocol)) { const r = await fetch('config.json', { cache: 'no-store' }); if (r.ok) { const j = await r.json(); if (j.url && j.key) { CFG = { url: String(j.url).replace(/\/+$/, ''), key: j.key }; return; } } } } catch (e) {}
+  try { const j = JSON.parse(localStorage.getItem('miniagent.cfg') || '{}'); if (j.url && j.key) CFG = j; } catch (e) {}
+}
+document.querySelectorAll('.ov [data-close]').forEach(b => { b.onclick = () => { b.closest('.ov').style.display = 'none'; }; });
+const openServer = () => { $('#surl').value = CFG.url; $('#skey').value = CFG.key; $('#sd').style.display = 'flex'; };
+$('#hserver').onclick = openServer;
+$('#ssave').onclick = () => {
+  CFG = { url: $('#surl').value.trim().replace(/\/+$/, ''), key: $('#skey').value.trim() };
+  try { localStorage.setItem('miniagent.cfg', JSON.stringify(CFG)); } catch (e) {}
+  $('#sd').style.display = 'none'; homeLoad();
+};
+function openAi() {
+  const v = $('#backend').value; if (v === 'demo' || v === 'local') return;
+  const c = aiCfg()[v] || {};
+  $('#aiprov').textContent = AINAME[v]; $('#aikeyf').value = c.key || ''; $('#aimodel').value = c.model || AIDEF[v]; $('#aid').style.display = 'flex';
+}
+$('#aikey').onclick = openAi;
+$('#aisave').onclick = () => {
+  const v = $('#backend').value, all = aiCfg();
+  all[v] = { key: $('#aikeyf').value.trim(), model: $('#aimodel').value.trim() || AIDEF[v] };
+  try { localStorage.setItem('miniagent.ai', JSON.stringify(all)); } catch (e) {}
+  $('#aid').style.display = 'none'; applyMode();
+};
+let authMode = 'in', afterLogin = null;
+function openAuth(mode, note) {
+  authMode = mode; $('#adnote').textContent = note || ''; $('#admsg').textContent = '';
+  $('#adname').style.display = mode === 'up' ? '' : 'none';
+  $('#adin').classList.toggle('primary', mode === 'in'); $('#adup').classList.toggle('primary', mode === 'up');
+  $('#ad').style.display = 'flex';
+}
+$('#adin').onclick = () => openAuth('in', $('#adnote').textContent);
+$('#adup').onclick = () => openAuth('up', $('#adnote').textContent);
+$('#adgo').onclick = async () => {
+  const msg = $('#admsg'), em = $('#ademail').value.trim(), pw = $('#adpw').value, nm = $('#adname').value.trim();
+  if (!sb.ok()) { msg.textContent = 'Der Server ist noch nicht verbunden („Server einrichten“).'; return; }
+  if (!em || pw.length < 6) { msg.textContent = 'E-Mail eintragen und ein Passwort mit mindestens 6 Zeichen wählen.'; return; }
+  msg.textContent = 'Einen Moment …';
+  try {
+    const up = authMode === 'up';
+    const r = await sbf(up ? '/auth/v1/signup' : '/auth/v1/token?grant_type=password', { method: 'POST', body: JSON.stringify(up ? { email: em, password: pw, data: { name: nm || em.split('@')[0] } } : { email: em, password: pw }) }, false);
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.msg || j.error_description || j.message || 'Status ' + r.status);
+    if (j.access_token) { setSess(j); $('#ad').style.display = 'none'; homeLoad(); if (afterLogin) { const f = afterLogin; afterLogin = null; f(); } }
+    else msg.textContent = 'Fast geschafft: Bestätige die E-Mail, die du bekommen hast, und melde dich dann an.';
+  } catch (e) { msg.textContent = 'Fehlgeschlagen: ' + (e.message || e); }
+};
+function showViewer(title, html) { $('#vt').textContent = title; $('#vframe').srcdoc = html; $('#vm').style.display = 'flex'; }
+async function openSite(slug) {
+  try {
+    const r = await sbf('/rest/v1/sites?select=title,html,slug&slug=eq.' + encodeURIComponent(slug), {}, !!sess);
+    const j = await r.json();
+    if (!j[0]) throw new Error('nicht gefunden');
+    showViewer(j[0].title, j[0].html);
+    sbf('/rest/v1/rpc/view_site', { method: 'POST', body: JSON.stringify({ s: slug }) }, false).catch(() => {});
+  } catch (e) { $('#hnote').textContent = 'Diese Seite ließ sich nicht öffnen: ' + (e.message || e); }
+}
+function siteCard(x, mine) {
+  const d = document.createElement('div'); d.className = 'sc';
+  const t = document.createElement('b'); t.textContent = (x.kind === 'game' ? '🎮 ' : '🌐 ') + x.title;
+  const m = document.createElement('small'); m.textContent = (mine ? '' : 'Von ' + (x.owner_name || 'Unbekannt') + ', ') + 'Aufrufe: ' + (x.views || 0);
+  const a = document.createElement('div'); a.className = 'acts';
+  const mk = (txt, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = txt; b.onclick = fn; a.appendChild(b); return b; };
+  mk('Öffnen', () => openSite(x.slug));
+  if (mine) {
+    mk('Bearbeiten', () => { curSite = x.id; loadProject(x.project || {}); });
+    const del = mk('Löschen', async () => {
+      if (!del.dataset.s) { del.dataset.s = '1'; del.textContent = 'Wirklich?'; setTimeout(() => { del.dataset.s = ''; del.textContent = 'Löschen'; }, 3000); return; }
+      await sbf('/rest/v1/sites?id=eq.' + x.id, { method: 'DELETE' }); homeLoad();
+    });
+  }
+  d.append(t, m, a);
+  return d;
+}
+async function homeLoad() {
+  const note = $('#hnote'), grid = $('#hgrid'), q = $('#hq').value.trim();
+  $('#htitle').textContent = q ? 'Ergebnisse für „' + q + '“' : 'Beliebteste';
+  $('#hlogin').textContent = sess ? 'Abmelden (' + sess.user.name + ')' : 'Anmelden';
+  $('#hmine').hidden = !sess; grid.innerHTML = '';
+  if (!sb.ok()) { note.textContent = 'Der Server ist noch nicht verbunden. Du kannst trotzdem lokal bauen. Mit „Server einrichten“ verbindest du Supabase, damit Seiten hochgeladen und durchsucht werden können.'; return; }
+  note.textContent = '';
+  try {
+    let path = '/rest/v1/sites?select=id,slug,title,kind,owner_name,views&status=eq.approved&order=views.desc,created_at.desc&limit=' + (q ? 40 : 12);
+    if (q) { const w = '*' + q.replace(/[*,()%]/g, ' ') + '*'; path += '&or=' + encodeURIComponent('(title.ilike.' + w + ',owner_name.ilike.' + w + ')'); }
+    const r = await sbf(path, {}, false), j = await r.json();
+    if (!r.ok) throw new Error(aiErr(j, r));
+    if (!j.length) grid.textContent = q ? 'Nichts gefunden.' : 'Noch nichts hochgeladen. Sei die erste Person!';
+    j.forEach(x => grid.appendChild(siteCard(x, false)));
+  } catch (e) { note.textContent = 'Laden fehlgeschlagen: ' + (e.message || e); }
+  if (sess) mineLoad();
+}
+async function mineLoad() {
+  const g = $('#hmygrid');
+  try {
+    const r = await sbf('/rest/v1/sites?select=id,slug,title,kind,views,project&owner=eq.' + sess.user.id + '&order=created_at.desc'), j = await r.json();
+    if (!r.ok) throw new Error(aiErr(j, r));
+    g.innerHTML = ''; if (!j.length) g.textContent = 'Du hast noch nichts hochgeladen.';
+    j.forEach(x => g.appendChild(siteCard(x, true)));
+  } catch (e) { g.textContent = 'Laden fehlgeschlagen: ' + (e.message || e); }
+}
+let hqTimer = 0;
+$('#hq').oninput = () => { clearTimeout(hqTimer); hqTimer = setTimeout(homeLoad, 300); };
+$('#hlogin').onclick = () => { if (sess) { setSess(null); homeLoad(); } else openAuth('in', ''); };
+$('#hcreate').onclick = () => {
+  if (sb.ok() && !sess) { afterLogin = () => { $('#cd').style.display = 'flex'; }; openAuth('in', 'Melde dich an, um etwas zu erstellen.'); return; }
+  $('#cd').style.display = 'flex';
+};
+function startEditor(kind, keep) {
+  projKind = kind; document.body.dataset.kind = kind; document.body.dataset.view = 'editor';
+  if (keep) return;
+  files = {}; history = []; current = ''; currentId = null; curSite = null; projSrc = 'blocks'; errors = []; $('#frame').srcdoc = '';
+  if (kind === 'game') proj = JSON.parse(DEF_PROJ); else { els = JSON.parse(DEF_ELS); bgc = '#ffffff'; sel = -1; }
+  selSp = 0; log.innerHTML = ''; intro(); setLeft('blocks'); blocksOpen(); tab('h');
+}
+$('#cgame').onclick = () => { $('#cd').style.display = 'none'; startEditor('game'); };
+$('#csite').onclick = () => { $('#cd').style.display = 'none'; startEditor('site'); };
+$('#hhome').onclick = () => { document.body.dataset.view = 'home'; homeLoad(); };
+function loadProject(pj) {
+  startEditor(pj.kind === 'site' ? 'site' : 'game', true);
+  files = {}; history = []; errors = []; currentId = null; projSrc = pj.src || 'blocks'; log.innerHTML = ''; intro();
+  if (projSrc === 'blocks' && pj.kind === 'site' && pj.els) { els = pj.els; bgc = pj.bgc || '#ffffff'; sel = -1; setLeft('blocks'); blocksOpen(); }
+  else if (projSrc === 'blocks' && pj.proj) { proj = pj.proj; selSp = 0; setLeft('blocks'); blocksOpen(); }
+  else if (pj.files) { files = pj.files; current = 'index.html'; openFile = ''; drawFiles(); drawIde(); render(); setLeft('code'); }
+  tab('h');
+}
+const BAD = [[/<script[^>]+src\s*=\s*["']?https?:/i, 'lädt Skripte aus dem Internet'], [/\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon/i, 'sendet Daten ins Internet'], [/window\.open|\blocation\s*(\.|=)|\btop\.|\bparent\./i, 'leitet um oder greift auf andere Fenster zu'], [/document\.cookie|localStorage|sessionStorage|indexedDB/i, 'greift auf Speicher oder Cookies zu'], [/type\s*=\s*["']?password|<form\b/i, 'enthält ein Formular oder Passwortfeld'], [/<iframe|<object|<embed/i, 'bettet fremde Inhalte ein']];
+const lint = t => BAD.filter(([re]) => re.test(t)).map(([, w]) => w);
+const MOD = 'You are a strict but fair moderator for a platform where young people share small web games and web pages. Check the app below. Reject it if it contains hate, sexual content, violence, illegal content, harassment, requests for personal data or passwords, phishing, redirects, tracking, external network requests, external scripts or malicious code. Also reject it if it is obviously broken, empty or only a placeholder. Answer with ONLY a JSON object: {"ok": true or false, "reason": "one short sentence in German"}';
+$('#upl').onclick = () => {
+  if (!files['index.html']) { noApp(); return; }
+  if (!sb.ok()) { setStatus('Der Server ist noch nicht verbunden.'); openServer(); return; }
+  if (!sess) { afterLogin = () => $('#upl').click(); openAuth('in', 'Melde dich an, um hochzuladen.'); return; }
+  $('#upt').value = nameOf(); $('#uplink').value = '';
+  $('#upmsg').textContent = aiReady() ? 'Vor dem Hochladen prüft die verbundene KI deine Seite.' : 'Zum Hochladen muss eine KI verbunden sein: Wähle oben „Lokales Modell“ (und lade es herunter) oder Claude, ChatGPT oder Gemini mit deinem Schlüssel.';
+  $('#upgo').disabled = !aiReady(); $('#up').style.display = 'flex';
+};
+async function upload(title, note, html) {
+  const rec = { title, kind: projKind === 'site' ? 'site' : 'game', html, owner_name: sess.user.name, status: 'approved', ai_note: note.slice(0, 300), project: { kind: projKind, src: projSrc, ...(projSrc === 'blocks' ? (projKind === 'site' ? { els, bgc } : { proj }) : { files }) } };
+  const hdr = { Prefer: 'return=representation' };
+  if (curSite) {
+    const r = await sbf('/rest/v1/sites?id=eq.' + curSite, { method: 'PATCH', headers: hdr, body: JSON.stringify(rec) });
+    if (!r.ok) throw new Error('Server: Status ' + r.status);
+    return (await r.json())[0].slug;
+  }
+  const base = slugify(title);
+  for (let i = 0; i < 4; i++) {
+    const slug = i ? base + '-' + Math.random().toString(36).slice(2, 6) : base;
+    const r = await sbf('/rest/v1/sites', { method: 'POST', headers: hdr, body: JSON.stringify({ ...rec, slug }) });
+    if (r.status === 409) continue;
+    if (!r.ok) throw new Error('Server: Status ' + r.status + (r.status === 401 || r.status === 403 ? ' (Anmeldung oder Rechte prüfen)' : ''));
+    const j = await r.json(); curSite = j[0].id; return j[0].slug;
+  }
+  throw new Error('Es wurde kein freier Name gefunden.');
+}
+$('#upgo').onclick = async () => {
+  const msg = $('#upmsg'), say = t => { msg.textContent = t; }, title = $('#upt').value.trim() || nameOf();
+  const html = bundle(true), subject = projSrc === 'blocks' ? JSON.stringify(projKind === 'site' ? { els } : { proj }) : html;
+  const bad = lint(subject);
+  if (bad.length) { say('Nicht hochgeladen: Die Seite ' + bad.join(', ') + '. Das ist auf der Plattform nicht erlaubt.'); return; }
+  $('#upgo').disabled = true;
+  try {
+    say('Die KI prüft deine Seite …');
+    const out = await llmOnce([{ role: 'system', content: MOD }, { role: 'user', content: 'Title: ' + title + '\nApp code:\n' + FENCE + 'html\n' + html.slice(0, 14000) + '\n' + FENCE }], 300);
+    let v = null; try { v = JSON.parse((/\{[\s\S]*\}/.exec(out) || [''])[0]); } catch (e) {}
+    if (!v) throw new Error('Die KI hat keine klare Antwort gegeben. Versuch es noch einmal.');
+    if (!v.ok) { say('Die KI lässt die Seite nicht zu: ' + (v.reason || 'Sie entspricht nicht den Regeln.')); $('#upgo').disabled = false; return; }
+    say('Geprüft. Lade hoch …');
+    const slug = await upload(title, v.reason || '', html);
+    let base = /^https?:/.test(location.protocol) ? location.href.split('#')[0] : '';
+    if (!base) { try { base = localStorage.getItem('miniagent.plat') || ''; } catch (e) {} }
+    $('#uplink').value = base ? base + '#site=' + slug : '';
+    say('Hochgeladen! Die Seite ist jetzt auf der Startseite zu finden.' + (base ? ' Teile den Link unten.' : ' Einen Link für andere gibt es erst, wenn die Plattform online liegt (Knopf „Eigene GitHub-Seite“, dann „Plattform hochladen“).'));
+    homeLoad();
+  } catch (e) { say('Fehlgeschlagen: ' + (e.message || e)); }
+  $('#upgo').disabled = !aiReady();
+};
+function pickFile() {
+  return new Promise((ok, no) => {
+    const i = document.createElement('input'); i.type = 'file'; i.accept = '.html,text/html';
+    i.onchange = async () => { if (i.files[0]) ok(await i.files[0].text()); else no(new Error('Keine Datei gewählt.')); };
+    i.oncancel = () => no(new Error('Keine Datei gewählt.'));
+    i.click();
+  });
+}
+$('#pplat').onclick = async () => {
+  const msg = $('#pmsg'), say = t => { msg.textContent = t; };
+  const tok = $('#gtoken').value.trim(), repo = $('#grepo').value.trim() || 'meine-apps';
+  if (!tok) { $('#gset').open = true; say('Verbinde zuerst GitHub: Token eintragen.'); return; }
+  $('#pplat').disabled = true;
+  try {
+    let src = '';
+    if (/^https?:/.test(location.protocol)) { try { const r = await fetch(location.href.split('#')[0]); if (r.ok) src = await r.text(); } catch (e) {} }
+    if (!src) { say('Wähle jetzt die Datei index.html aus, die du heruntergeladen hast.'); src = await pickFile(); }
+    const out = { 'index.html': src };
+    if (sb.ok()) out['config.json'] = JSON.stringify(CFG);
+    const res = await ghPublish(tok, repo, '', out, say);
+    try { localStorage.setItem('miniagent.gh', JSON.stringify({ tok, repo, login: res.login })); } catch (e) {}
+    $('#plink').value = res.url;
+    try { localStorage.setItem('miniagent.plat', res.url); } catch (e) {}
+    say('Plattform hochgeladen. In ein bis zwei Minuten ist sie unter diesem Link erreichbar.' + (sb.ok() ? ' Adresse und öffentlicher Schlüssel deines Servers liegen in config.json.' : ' Verbinde danach Supabase („Server einrichten“) und lade noch einmal hoch.'));
+  } catch (e) { say('Fehlgeschlagen: ' + (e.message || e)); }
+  $('#pplat').disabled = false;
+};
+function renderDemo() {
+  const g = $('#hdemo'); g.innerHTML = '';
+  BUILTIN.filter(b => !b.bug).forEach(b => {
+    const d = document.createElement('div'); d.className = 'sc';
+    const t = document.createElement('b'); t.textContent = '🎮 ' + b.name;
+    const sm = document.createElement('small'); sm.textContent = b.desc;
+    const x = document.createElement('button'); x.type = 'button'; x.textContent = 'Ausprobieren'; x.style.alignSelf = 'flex-start';
+    x.onclick = () => showViewer(b.name, demoHtml(b.kind, false));
+    d.append(t, sm, x); g.appendChild(d);
+  });
+}
+async function initPlatform() {
+  try { sess = JSON.parse(localStorage.getItem('miniagent.sess') || 'null'); } catch (e) { sess = null; }
+  renderDemo(); await loadCfg(); await homeLoad();
+  if (/^#site=/.test(location.hash) && sb.ok()) openSite(decodeURIComponent(location.hash.slice(6)));
+}
+
+function intro() {
+  add('step', 'Vier Wege zur Web-App: „KI“ (hier im Chat beschreiben, im Modus „Lokales Modell“), „Apps“ (Vorlagen und eigene Apps auswählen), „Code“ (eigenen Code einfügen) und „Blöcke“ (Seite aus Blöcken zusammenstecken). Oben kannst du speichern, veröffentlichen (Link und QR-Code) und als Offline-App sichern.');
+}
+loadApps(); drawLib(); applyMode(); intro(); tab('h');
+checkGpu().then(applyMode);
+initPlatform();
+} else viewer();
+</script>
+</body>
+</html>
